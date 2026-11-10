@@ -87,14 +87,26 @@ composer test            # Pest, in parallel
 | `GET /api/v1/me` | Current user with roles and effective permissions |
 | `GET /api/v1/permissions` · `roles` | RBAC catalogue (requires `access.manage`) |
 
+## Employees at a Glance
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/employees` | Directory with free-text search (`q`), whitelisted filters (`filter[status]=active,on_leave`, `filter[hire_date][gte]=…`, `filter[trashed]=only`), multi-field `sort=-hire_date,last_name` and cursor pagination |
+| `POST` · `GET` · `PATCH` `/api/v1/employees[/{id}]` | Create, read and update with validation, generated employee numbers and **optimistic locking** (`ETag` / `If-Match`) |
+| `DELETE /api/v1/employees/{id}` · `POST …/restore` | Soft delete and restore, blocked while the employee still has direct reports |
+| `GET` · `POST` · `DELETE /api/v1/employees/{id}/photo` | Profile photo: content-sniffed image upload, private storage, streamed only to authorised users |
+| `GET /api/v1/audit-events` | Hash-chained, tamper-evident audit trail of every change, with personal data masked |
+
+Personal data (`personal_email`, `phone`, `date_of_birth`) is encrypted at rest. It is only returned with `employee.view.sensitive` and only writable with `employee.update.sensitive`.
+
 Errors follow RFC 9457 (`application/problem+json`) with stable `code`s and a `request_id`. Design: [docs/06](docs/06-authentication.md), [ADR-0006](docs/adr/0006-jwt-access-and-rotating-refresh-tokens.md).
 
 ## Roadmap
 
 | Phase | Scope |
 |---|---|
-| **1 — Foundation** | Monorepo, Docker dev environment, CI pipeline, Identity (✅ JWT auth, password reset, e-mail verification; MFA next), Tenancy, RBAC (✅ roles & permissions; scopes next), Audit |
-| **2 — Core HR** | Organisation (departments, positions, locations), Employee profiles, Documents |
+| **1 — Foundation** | Monorepo, Docker dev environment, CI pipeline, Identity (✅ JWT auth, password reset, e-mail verification; MFA next), Tenancy, RBAC (✅ roles & permissions; scopes next), Audit (✅ hash-chained trail) |
+| **2 — Core HR** | Organisation (departments, positions, locations), Employee profiles (✅ CRUD, search, photos, soft delete), Documents |
 | **3 — Time** | Leave policies and requests with approval workflow, Attendance |
 | **4 — Compensation** | Salary history, bands, field-level protection |
 | **5 — Production** | Terraform for AWS, blue/green deploys, dashboards, load tests, runbooks |

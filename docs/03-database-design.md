@@ -111,6 +111,8 @@ GiST index on `path` → "all employees in Engineering and below" is one indexed
 
 ### 2.5 Employee
 
+> **Implemented (Phase 4):** `employees` with identity, contact and employment fields; `personal_email`, `phone` and `date_of_birth` encrypted; `manager_id`; profile photo (`photo_path`, `photo_mime_type`); `version`; soft deletes. Employee numbers come from a locked counter row in `employee_number_sequences`. **Not yet built:** `department_id`/`location_id` (Organisation module), `user_id`, `national_id`, `search_vector` and the partial unique index on `work_email`. Work-e-mail uniqueness among active employees is enforced by the application for now, because the project rules avoid raw SQL.
+
 **employees**
 
 | Column | Type | Notes |
@@ -226,7 +228,9 @@ Files are never stored in PostgreSQL. Uploads go directly to S3 via presigned UR
 | request_id | uuid | joins audit to logs and traces |
 | prev_hash, hash | bytea | SHA-256 of (prev_hash ‖ canonical row) |
 
-Partitioned monthly. The app's database role has only `INSERT` and `SELECT` on this table; `UPDATE`/`DELETE` are revoked. Old partitions are exported to S3 (Object Lock, compliance mode) before detaching.
+**Implemented:** a single chain (`global`) today; per-tenant chains come with Tenancy. Appends lock the chain's row in `audit_chain_heads`, so concurrent writers can never fork the chain. The `AuditEvent` model refuses updates and deletes, and `php artisan audit:verify` recomputes the whole chain.
+
+*Planned for production:* partitioned monthly. The app's database role has only `INSERT` and `SELECT` on this table; `UPDATE`/`DELETE` are revoked. Old partitions are exported to S3 (Object Lock, compliance mode) before detaching.
 
 **outbox_messages** — `id`, `tenant_id`, `event_type`, `payload jsonb`, `occurred_at`, `published_at NULL`, `attempts`. Index on `(published_at) WHERE published_at IS NULL`.
 

@@ -126,6 +126,8 @@ Dashboards are defined in Terraform, not clicked together.
 
 Separate from technical logs: it is **data the product shows to customers**, so it lives in PostgreSQL with guarantees.
 
+> **Implemented (Phase 4):** `Audit` module. Other modules call `Audit\Contracts\AuditRecorder` inside their transaction and build field diffs with `ChangeSet`, which masks sensitive values. Events are hash-chained, the model refuses edits, `php artisan audit:verify` checks the chain, and `GET /api/v1/audit-events` reads it (`audit.view`). Employee create, update, delete, restore and photo changes are audited. Security events (login, lockout and so on) are still only in the application log.
+
 ### What is audited
 
 - Create/update/delete of employees, employment, compensation, documents, leave decisions and adjustments, attendance corrections.

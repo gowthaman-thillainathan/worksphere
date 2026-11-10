@@ -36,6 +36,10 @@ tags:
   - name: Current user
   - name: Access control
     description: Roles and permissions (RBAC).
+  - name: Employees
+    description: Employee profiles, directory search and profile photos.
+  - name: Audit
+    description: Tamper-evident audit trail.
 
 paths:
   /auth/login:
@@ -301,6 +305,375 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /employees:
+    get:
+      tags: [Employees]
+      operationId: listEmployees
+      summary: Search, filter, sort and page through the employee directory
+      description: |
+        Requires `employee.view`. Cursor-paginated: pass `meta.next_cursor` back as `cursor`.
+        Values inside one filter are OR-ed (`filter[status]=active,on_leave`); different
+        filters are AND-ed. Unknown filters or sort fields are rejected with 422.
+      parameters:
+        - name: q
+          in: query
+          description: Case-insensitive substring match on first/last/preferred name, employee number and work e-mail.
+          schema:
+            type: string
+            maxLength: 100
+        - name: filter[status]
+          in: query
+          description: Comma-separated statuses.
+          schema:
+            type: string
+            example: active,on_leave
+        - name: filter[employment_type]
+          in: query
+          description: Comma-separated employment types.
+          schema:
+            type: string
+            example: full_time,part_time
+        - name: filter[manager_id]
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: filter[hire_date][gte]
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: filter[hire_date][lte]
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: filter[trashed]
+          in: query
+          description: Include soft-deleted employees (`with`) or show only them (`only`).
+          schema:
+            type: string
+            enum: [with, only]
+        - name: sort
+          in: query
+          description: 'Comma-separated fields; prefix with `-` for descending. Default: `last_name,first_name`.'
+          schema:
+            type: string
+            example: -hire_date,last_name
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of employees.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, links]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Employee'
+                  meta:
+                    $ref: '#/components/schemas/CursorMeta'
+                  links:
+                    $ref: '#/components/schemas/CursorLinks'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    post:
+      tags: [Employees]
+      operationId: createEmployee
+      summary: Create an employee
+      description: |
+        Requires `employee.create`; personal fields (`personal_email`, `phone`,
+        `date_of_birth`) also require `employee.update.sensitive`. The employee number is
+        generated. Audited as `employee.created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeCreate'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /employees/{employee}:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    get:
+      tags: [Employees]
+      operationId: getEmployee
+      summary: Get one employee
+      description: Requires `employee.view`. Personal fields are included only with `employee.view.sensitive`.
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Employees]
+      operationId: updateEmployee
+      summary: Update some fields of an employee
+      description: |
+        Requires `employee.update` (and `employee.update.sensitive` for personal fields).
+        Send the `ETag` you received as `If-Match`; a stale version is rejected with 412.
+        Only real changes bump the version and are audited as `employee.updated`.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeUpdate'
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+    delete:
+      tags: [Employees]
+      operationId: deleteEmployee
+      summary: Soft-delete an employee
+      description: |
+        Requires `employee.delete` and `If-Match`. The record is hidden from the directory but
+        kept (restorable, history preserved). Employees with direct reports cannot be deleted.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+
+  /employees/{employee}/restore:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    post:
+      tags: [Employees]
+      operationId: restoreEmployee
+      summary: Restore a soft-deleted employee
+      description: Requires `employee.delete`. Idempotent. Fails with 409 if the work e-mail was reused meanwhile.
+      responses:
+        '200':
+          description: Restored.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /employees/{employee}/photo:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    get:
+      tags: [Employees]
+      operationId: getEmployeePhoto
+      summary: Download the profile photo
+      description: Requires `employee.view`. Served through the API; photos are never publicly addressable.
+      responses:
+        '200':
+          description: The image.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Employees]
+      operationId: uploadEmployeePhoto
+      summary: Upload or replace the profile photo
+      description: |
+        Requires `employee.update`. JPEG, PNG or WebP (type detected from content), at most
+        2 MB, between 128×128 and 4096×4096 pixels. Audited as `employee.photo_updated`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Photo stored.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Employees]
+      operationId: deleteEmployeePhoto
+      summary: Remove the profile photo
+      description: Requires `employee.update`. Audited as `employee.photo_removed`.
+      responses:
+        '204':
+          description: Removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      summary: Browse the audit trail (newest first)
+      description: |
+        Requires `audit.view`. Every event is hash-chained to the previous one; the chain is
+        verified nightly (`php artisan audit:verify`). Personal data values are masked as `***`.
+      parameters:
+        - name: filter[subject_type]
+          in: query
+          schema:
+            type: string
+            example: employee
+        - name: filter[subject_id]
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: filter[actor_id]
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: filter[action]
+          in: query
+          schema:
+            type: string
+            example: employee.updated
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, links]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEvent'
+                  meta:
+                    $ref: '#/components/schemas/CursorMeta'
+                  links:
+                    $ref: '#/components/schemas/CursorLinks'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
 security:
   - bearerAuth: []
 
@@ -317,7 +690,42 @@ components:
       name: refresh_token
       description: Opaque, single-use refresh token set by login/refresh. Not readable by JavaScript.
 
+  parameters:
+    EmployeeId:
+      name: employee
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: The ETag of the version you are editing, e.g. `"v3"`.
+      schema:
+        type: string
+        example: '"v3"'
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `meta.next_cursor` / `meta.prev_cursor`.
+      schema:
+        type: string
+
   headers:
+    ETag:
+      description: 'Current version of the resource, e.g. `"v3"`. Send it back as `If-Match` when writing.'
+      schema:
+        type: string
     RefreshTokenCookie:
       description: '`refresh_token=<opaque>; Path=/api/v1/auth; Secure; HttpOnly; SameSite=Strict`'
       schema:
@@ -447,6 +855,220 @@ components:
           items:
             type: string
 
+    EmployeeEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Employee'
+
+    Employee:
+      type: object
+      required: [id, type, employee_number, first_name, last_name, display_name, work_email, job_title, employment_type, status, hire_date, meta]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [employee]
+        employee_number:
+          type: string
+          example: EMP-000421
+        first_name:
+          type: string
+        last_name:
+          type: string
+        preferred_name:
+          type: [string, 'null']
+        display_name:
+          type: string
+        work_email:
+          type: string
+          format: email
+        job_title:
+          type: string
+        employment_type:
+          $ref: '#/components/schemas/EmploymentType'
+        status:
+          $ref: '#/components/schemas/EmployeeStatus'
+        hire_date:
+          type: string
+          format: date
+        termination_date:
+          type: [string, 'null']
+          format: date
+        manager:
+          type: [object, 'null']
+          properties:
+            id:
+              type: string
+              format: uuid
+            display_name:
+              type: string
+        photo_url:
+          type: [string, 'null']
+          format: uri
+        personal_email:
+          type: [string, 'null']
+          description: Only with `employee.view.sensitive`.
+        phone:
+          type: [string, 'null']
+          description: Only with `employee.view.sensitive`.
+        date_of_birth:
+          type: [string, 'null']
+          format: date
+          description: Only with `employee.view.sensitive`.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: [string, 'null']
+          format: date-time
+        meta:
+          type: object
+          required: [version, permissions]
+          properties:
+            version:
+              type: integer
+            permissions:
+              type: array
+              description: Actions the current user may take on this record.
+              items:
+                type: string
+                enum: [update, delete, view_sensitive, update_sensitive]
+
+    EmployeeStatus:
+      type: string
+      enum: [pre_boarding, active, on_leave, notice, terminated]
+
+    EmploymentType:
+      type: string
+      enum: [full_time, part_time, contract, intern]
+
+    EmployeeUpdate:
+      type: object
+      description: Any subset of fields; sent fields may not be blank. `termination_date` is required when `status` is `terminated`.
+      additionalProperties: false
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        preferred_name:
+          type: [string, 'null']
+          maxLength: 100
+        work_email:
+          type: string
+          format: email
+          maxLength: 255
+        job_title:
+          type: string
+          maxLength: 150
+        employment_type:
+          $ref: '#/components/schemas/EmploymentType'
+        status:
+          $ref: '#/components/schemas/EmployeeStatus'
+        hire_date:
+          type: string
+          format: date
+        termination_date:
+          type: [string, 'null']
+          format: date
+        manager_id:
+          type: [string, 'null']
+          format: uuid
+        personal_email:
+          type: [string, 'null']
+          format: email
+        phone:
+          type: [string, 'null']
+          example: +94 77 123 4567
+        date_of_birth:
+          type: [string, 'null']
+          format: date
+          description: At least 16 years ago.
+
+    EmployeeCreate:
+      allOf:
+        - $ref: '#/components/schemas/EmployeeUpdate'
+        - type: object
+          required: [first_name, last_name, work_email, job_title, employment_type, hire_date]
+
+    CursorMeta:
+      type: object
+      required: [per_page, next_cursor, prev_cursor]
+      properties:
+        per_page:
+          type: integer
+        next_cursor:
+          type: [string, 'null']
+        prev_cursor:
+          type: [string, 'null']
+
+    CursorLinks:
+      type: object
+      properties:
+        next:
+          type: [string, 'null']
+          format: uri
+        prev:
+          type: [string, 'null']
+          format: uri
+
+    AuditEvent:
+      type: object
+      required: [id, type, occurred_at, actor, action, subject, changes]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [audit_event]
+        occurred_at:
+          type: string
+          format: date-time
+        actor:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [user, system]
+            id:
+              type: [string, 'null']
+              format: uuid
+        action:
+          type: string
+          example: employee.updated
+        subject:
+          type: object
+          properties:
+            type:
+              type: string
+              example: employee
+            id:
+              type: string
+              format: uuid
+        changes:
+          type: object
+          description: '{field: [old, new]}; personal data values are masked as "***".'
+          additionalProperties:
+            type: array
+            minItems: 2
+            maxItems: 2
+          example:
+            job_title: [Engineer, Lead Engineer]
+        ip_address:
+          type: [string, 'null']
+        request_id:
+          type: [string, 'null']
+          format: uuid
+
     Problem:
       type: object
       description: RFC 9457 Problem Details.
@@ -516,6 +1138,30 @@ components:
             $ref: '#/components/schemas/Problem'
     Forbidden:
       description: Missing permission (`forbidden`) or unverified e-mail address (`email_not_verified`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The resource does not exist or is not visible to you (e.g. `employee_not_found`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Business conflict, e.g. `work_email_in_use`, `employee_has_direct_reports`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: The `If-Match` version is stale (`version_mismatch`) or malformed. Reload and retry.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionRequired:
+      description: The `If-Match` header is missing (`precondition_required`).
       content:
         application/problem+json:
           schema:

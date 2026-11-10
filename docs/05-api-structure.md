@@ -111,7 +111,7 @@ Content type: `application/problem+json`. Domain exceptions map to stable `code`
 | Includes | `include=a,b` | `include=department,manager` |
 | Page | `cursor=`, `per_page=` (max 100) | |
 
-Every filterable, sortable and includable field is **whitelisted** per endpoint (Spatie Query Builder). Unknown parameters → `400`. This avoids unindexed queries and accidental data exposure through includes.
+Every filterable, sortable and includable field is **whitelisted** per endpoint (a small in-house parser in `Shared\Http\Query`; no query-builder package). Unknown filters, sort fields or values → `422 validation_failed`. This avoids unindexed queries and accidental data exposure through includes.
 
 ## 5. Endpoint Catalogue (v1)
 
@@ -152,10 +152,13 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/employees` | `employee.view` (results filtered by scope) |
-| POST | `/employees` | `employee.create` |
-| GET | `/employees/{id}` | `employee.view` |
-| PATCH | `/employees/{id}` | `employee.update` (+ `employee.update.sensitive` for PII fields) |
+| GET | `/employees` ✅ | `employee.view` — `q`, `filter[status\|employment_type\|manager_id\|hire_date][gte\|lte]\|trashed]`, `sort`, cursor pagination |
+| POST | `/employees` ✅ | `employee.create` (+ `employee.update.sensitive` for PII fields) |
+| GET | `/employees/{id}` ✅ | `employee.view` (PII only with `employee.view.sensitive`) |
+| PATCH | `/employees/{id}` ✅ | `employee.update` (+ `employee.update.sensitive` for PII fields), `If-Match` required |
+| DELETE | `/employees/{id}` ✅ | `employee.delete` — soft delete, `If-Match` required; refused while the employee has direct reports |
+| POST | `/employees/{id}/restore` ✅ | `employee.delete` |
+| GET / POST / DELETE | `/employees/{id}/photo` ✅ | `employee.view` / `employee.update` — multipart upload, private storage, streamed through the API |
 | POST | `/employees/{id}/transfer` | `employee.transfer` — creates new employment record |
 | POST | `/employees/{id}/terminate` | `employee.terminate` |
 | POST | `/employees/{id}/rehire` | `employee.create` |
@@ -208,7 +211,7 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 | GET ✅ / POST / PATCH / DELETE | `/roles` | `access.manage` |
 | GET / POST / DELETE | `/users/{id}/role-assignments` | `access.manage` |
 | CRUD | `/users` (invite, disable, unlock) | `user.manage` |
-| GET | `/audit-events?filter[subject_id]=…` | `audit.view` |
+| GET | `/audit-events?filter[subject_id]=…` ✅ | `audit.view` — also `filter[subject_type\|actor_id\|action]`, newest first |
 | GET / PATCH | `/tenant/settings` | `tenant.manage` |
 | CRUD | `/tenant/sso-connections` | `tenant.manage` |
 | CRUD | `/webhooks` | `integration.manage` |

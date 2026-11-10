@@ -17,4 +17,5 @@ enum ErrorCategory
     case Forbidden;
     case NotFound;
     case Conflict;
+    case PreconditionFailed;
 }
