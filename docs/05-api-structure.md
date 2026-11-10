@@ -117,17 +117,22 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 
 ### Auth & Session — see [06-authentication.md](06-authentication.md)
 
+✅ = implemented; the others are planned. The machine-readable contract is [`packages/api-contract/spec/openapi.yaml`](../packages/api-contract/spec/openapi.yaml), served by Swagger UI at `/docs` when `API_DOCS_ENABLED=true`.
+
 | Method | Path | Description |
 |---|---|---|
-| GET | `/sanctum/csrf-cookie` | Get XSRF cookie (SPA) |
-| POST | `/auth/login` | Email + password |
+| POST | `/auth/login` ✅ | E-mail + password → JWT access token + refresh-token cookie |
+| POST | `/auth/refresh` ✅ | Rotate the refresh token (cookie) → new access token |
+| POST | `/auth/logout` ✅ | End the current session |
+| POST | `/auth/logout-all` ✅ | End every session of the user |
+| POST | `/auth/forgot-password` ✅ | Send reset e-mail (always 202) |
+| POST | `/auth/reset-password` ✅ | Reset with token; signs out everywhere |
+| GET | `/auth/email/verify/{id}/{hash}` ✅ | Signed e-mail link; redirects to the SPA |
+| POST | `/auth/email/verification-notification` ✅ | Re-send the verification e-mail |
 | POST | `/auth/mfa/verify` | Submit TOTP or recovery code |
-| POST | `/auth/logout` | End session |
-| POST | `/auth/forgot-password` | Send reset email (always 202) |
-| POST | `/auth/reset-password` | Reset with token |
 | GET | `/auth/sso/{tenant}/redirect` | Start OIDC/SAML login |
 | GET | `/auth/sso/{tenant}/callback` | IdP callback |
-| GET | `/me` | Current user, employee profile, effective permissions, tenant settings |
+| GET | `/me` ✅ | Current user, roles and effective permissions (employee profile and tenant settings later) |
 | POST | `/me/mfa` | Begin MFA enrolment (returns QR provisioning URI) |
 | POST | `/me/mfa/confirm` | Confirm enrolment, returns recovery codes once |
 | GET / DELETE | `/me/sessions`, `/me/sessions/{id}` | List and revoke active sessions |
@@ -199,8 +204,8 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/permissions` | `access.manage` |
-| CRUD | `/roles` | `access.manage` |
+| GET | `/permissions` ✅ | `access.manage` |
+| GET ✅ / POST / PATCH / DELETE | `/roles` | `access.manage` |
 | GET / POST / DELETE | `/users/{id}/role-assignments` | `access.manage` |
 | CRUD | `/users` (invite, disable, unlock) | `user.manage` |
 | GET | `/audit-events?filter[subject_id]=…` | `audit.view` |

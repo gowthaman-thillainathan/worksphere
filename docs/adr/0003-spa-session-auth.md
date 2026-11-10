@@ -1,6 +1,6 @@
 # 0003 — Cookie Sessions (Sanctum) for the SPA Instead of JWT
 
-- Status: Accepted
+- Status: Superseded by [0006](0006-jwt-access-and-rotating-refresh-tokens.md)
 - Date: 2026-11-10
 
 ## Context

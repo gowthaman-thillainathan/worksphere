@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         failOnRisky="true"
+         failOnWarning="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>src/Modules/*/Tests/Unit</directory>
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>src/Modules/*/Tests/Feature</directory>
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Architecture">
+            <directory>tests/Architecture</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+            <directory>src</directory>
+        </include>
+        <exclude>
+            <directory>src/Modules/*/Tests</directory>
+            <directory>src/Modules/*/Database</directory>
+        </exclude>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:2fl+Ktvkfl+Fuz4Qp/A75G2RTiWVA/ZoKZvp6fiiM10="/>
+        <env name="APP_URL" value="http://localhost"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="API_DOCS_ENABLED" value="true"/>
+        <env name="FRONTEND_URL" value="https://app.meridian.test"/>
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="5432"/>
+        <env name="DB_DATABASE" value="meridian_test"/>
+        <env name="DB_USERNAME" value="meridian"/>
+        <env name="DB_PASSWORD" value="secret"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="HASH_DRIVER" value="bcrypt"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="JWT_SECRET" value="base64:dGVzdC1vbmx5LWp3dC1zZWNyZXQtdGhhdC1pcy1sb25nLWVub3VnaC1mb3ItaHMyNTYtc2lnbmF0dXJlcw=="/>
+        <env name="REFRESH_TOKEN_COOKIE_SECURE" value="true"/>
+        <env name="PASSWORD_CHECK_COMPROMISED" value="false"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+    </php>
+</phpunit>
