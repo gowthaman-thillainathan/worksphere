@@ -1,33 +1,29 @@
 # 06 — Authentication Flow
 
+> **Status:** password login, JWT access tokens, rotating refresh tokens, logout, password reset, e-mail verification and coarse RBAC are **implemented** (`apps/api/src/Modules/Identity`). MFA, SSO, tenancy and personal access tokens are designed below and still to be built.
+> Decision record: [ADR-0006](adr/0006-jwt-access-and-rotating-refresh-tokens.md), which supersedes ADR-0003.
+
 ## 1. Overview
 
-| Client | Mechanism | Why |
-|---|---|---|
-| **React SPA** (first-party) | Laravel Sanctum **stateful cookie sessions** + CSRF token | Session cookie is `HttpOnly` → JavaScript (and XSS) cannot read it. No tokens in `localStorage`. Server-side sessions can be revoked instantly. |
-| **Integrations / scripts** | Sanctum **personal access tokens** with abilities and expiry | Simple bearer tokens, scoped to a subset of permissions, revocable |
-| **Enterprise tenants** | **OIDC** (Okta, Azure AD/Entra ID, Google) and **SAML 2.0** | Corporate SSO, central offboarding |
-| **Second factor** | TOTP (RFC 6238) + one-time recovery codes; WebAuthn planned | Required for admin roles, tenant-configurable for everyone |
+| Credential | Format | Lifetime | Where the client keeps it | How it is revoked |
+|---|---|---|---|---|
+| **Access token** | JWT, HS256, `kid` header | 15 min | SPA memory only (never `localStorage`) | Expiry; `jti` deny-list on logout; `ver` claim bump on logout-all / password reset; user disabled |
+| **Refresh token** | Opaque 512-bit random, stored as SHA-256 | 14 days, **single-use** | `HttpOnly; Secure; SameSite=Strict` cookie, `Path=/api/v1/auth` | Rotation, family revocation, logout |
+| **Password reset token** | Laravel broker token, hashed | 30 min, single-use | E-mail link to the SPA | Used once or expired |
+| **E-mail verification link** | Signed URL (HMAC with `APP_KEY`) | 60 min | E-mail | Expiry; bound to the current address |
 
-**Why not JWT for the SPA?** Self-contained JWTs cannot be revoked before they expire without a deny-list (which brings server state back), and storing them in browser storage exposes them to XSS. The SPA and API share a parent domain, so cookie sessions are the simpler and safer choice. See [ADR-0003](adr/0003-spa-session-auth.md).
+**Access token claims**
 
-## 2. Domain & Cookie Setup
-
-```text
-SPA:  https://app.meridian.app      (CloudFront)
-API:  https://api.meridian.app      (ALB)
-```
-
-| Setting | Value |
+| Claim | Meaning |
 |---|---|
-| `SANCTUM_STATEFUL_DOMAINS` | `app.meridian.app` |
-| `SESSION_DOMAIN` | `.meridian.app` |
-| `SESSION_DRIVER` | `redis` |
-| Session cookie | `__Host-` style naming not possible across subdomains → `Secure`, `HttpOnly`, `SameSite=Lax` |
-| CORS | Allow origin `https://app.meridian.app` only, `supports_credentials: true` |
-| Session lifetime | 30 min idle, 12 h absolute (tenant-configurable) |
+| `iss`, `aud` | Issuer (API URL) and audience (`meridian-api`); both verified |
+| `sub` | User id |
+| `jti` | Token id, used for the logout deny-list |
+| `sid` | Session id = refresh-token family id |
+| `ver` | User's `token_version` when issued; must still match |
+| `iat`, `nbf`, `exp` | Issue time, not-before, expiry (30 s leeway for clock skew) |
 
-## 3. Password Login (with MFA)
+## 2. Login and Token Refresh
 
 ```mermaid
 sequenceDiagram
@@ -35,124 +31,117 @@ sequenceDiagram
     actor U as User
     participant SPA as React SPA
     participant API as Laravel API
-    participant R as Redis
     participant DB as PostgreSQL
 
-    SPA->>API: GET /sanctum/csrf-cookie
-    API-->>SPA: Set-Cookie: XSRF-TOKEN
-    U->>SPA: email + password
-    SPA->>API: POST /auth/login (X-XSRF-TOKEN)
-    API->>API: Rate limit (email+IP)
-    API->>DB: find user by (tenant, email)
-    alt invalid credentials or locked
-        API->>DB: increment failed_login_count, log attempt
-        API-->>SPA: 401 invalid_credentials (same message for unknown email)
-    else valid, MFA enabled
-        API->>R: session: auth.pending_user_id, mfa_pending=true
-        API->>API: session()->regenerate()
-        API-->>SPA: 200 { mfa_required: true }
-        U->>SPA: 6-digit TOTP
-        SPA->>API: POST /auth/mfa/verify
-        API->>API: verify TOTP (±1 step), reject reused code
-        API->>R: session: mfa_verified_at=now, login user
-        API->>API: session()->regenerate()
-        API->>DB: reset counters, last_login_at, audit "auth.login"
-        API-->>SPA: 200 { user }
-    else valid, no MFA
-        API->>R: login user
-        API-->>SPA: 200 { user, mfa_enrolment_required? }
+    U->>SPA: e-mail + password
+    SPA->>API: POST /auth/login
+    API->>API: rate limit (account+IP, IP)
+    API->>DB: find user (case-insensitive e-mail)
+    alt unknown / wrong password / locked / disabled
+        API->>DB: count failure → lock after 5 (15 min) + e-mail owner
+        API-->>SPA: 401 invalid_credentials (identical for every reason)
+    else valid
+        API->>DB: reset counters, last_login_at, rehash if needed
+        API->>DB: INSERT refresh_tokens (hash, family = new sid)
+        API-->>SPA: 200 { access_token, expires_in } + Set-Cookie refresh_token
     end
-    SPA->>API: GET /me
-    API-->>SPA: user, employee, permissions, tenant settings
+
+    Note over SPA,API: ~1 min before expiry (single in-flight refresh per app)
+    SPA->>API: POST /auth/refresh (cookie sent automatically)
+    API->>DB: SELECT … FOR UPDATE by token hash
+    alt token already rotated (replay)
+        API->>DB: revoke whole family
+        API-->>SPA: 401 invalid_refresh_token → sign in again
+    else valid
+        API->>DB: revoke old, insert new (same family)
+        API-->>SPA: 200 new access token + new cookie
+    end
 ```
 
 ### Key details
 
-- **Session fixation:** session ID regenerated after password step and again after MFA.
-- **User enumeration:** login and forgot-password return identical responses and similar timing for unknown emails.
-- **Lockout:** 5 failures → locked 15 min (exponential on repeat); admins can unlock. Lockout events notify the user by email.
-- **MFA gate:** `EnsureMfaVerified` middleware blocks every route except MFA endpoints while `mfa_pending` is set. Tenants can set MFA to `optional`, `required_for_admins` or `required_for_all`; users without MFA under a required policy are forced into enrolment.
-- **TOTP replay:** last used time-step stored per user; the same code cannot be used twice.
-- **Step-up auth:** sensitive actions (view salaries, change roles, export PII) require MFA within the last 15 min (`password.confirm`-style middleware with TOTP).
+- **User enumeration:** unknown accounts trigger a dummy hash check, so timing and response are the same as a wrong password. Forgot-password always answers `202`.
+- **Lockout:** after 5 consecutive wrong passwords the account is locked for 15 minutes and the owner gets an e-mail. A successful login or a password reset clears the counter.
+- **Hash upgrades:** if the hashing algorithm or cost changes, passwords are re-hashed transparently on the next successful login.
+- **Reuse detection:** a refresh token that was already rotated means someone copied it, so the whole family is revoked (OAuth 2.0 Security BCP §4.14).
+- **Concurrent refresh:** the token row is locked with `SELECT … FOR UPDATE`, so two parallel refreshes cannot both succeed.
+- **Unverified e-mail:** users can sign in, call `/me`, re-send the link and log out. Every other endpoint answers `403 email_not_verified`.
 
-## 4. SSO (OIDC) Flow
+## 3. Request Authentication (JWT guard)
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as User
-    participant SPA as SPA (acme.meridian.app/login)
-    participant API as Laravel API
-    participant IdP as Corporate IdP
+`Auth::viaRequest('jwt', BearerTokenAuthenticator)` registers a standard Laravel guard named `api`. For each request it:
 
-    U->>SPA: "Sign in with SSO"
-    SPA->>API: GET /auth/sso/acme/redirect
-    API->>API: create state + nonce + PKCE verifier (session)
-    API-->>U: 302 → IdP authorize URL
-    U->>IdP: authenticate (IdP's own MFA)
-    IdP-->>API: 302 /auth/sso/acme/callback?code&state
-    API->>API: validate state
-    API->>IdP: exchange code (+ PKCE verifier)
-    IdP-->>API: id_token, access_token
-    API->>API: verify signature (JWKS), iss, aud, exp, nonce
-    API->>API: match user by (tenant, email/subject) — JIT provision if allowed
-    API->>API: login, regenerate session, mark mfa_verified (IdP asserted amr)
-    API-->>U: 302 → https://app.meridian.app
-```
+1. reads `Authorization: Bearer <jwt>`;
+2. verifies the signature with the pinned algorithm (so `alg: none` and algorithm-confusion tokens are rejected), plus `kid`, `typ`, `iss`, `aud`, `nbf` and `exp`;
+3. loads the user and rejects the token if the user is disabled or locked, if `ver` ≠ `users.token_version`, or if `jti` is on the deny-list;
+4. stores the claims on the request (logout needs `sid`/`jti`) and adds `user_id` to the log context.
 
-- When a tenant sets SSO to `enforced`, password login is disabled for its users (break-glass admin account excepted, MFA mandatory).
-- **SCIM 2.0** provisioning endpoint is on the roadmap so IdP deactivation disables the user automatically.
+Any failure → `401 unauthenticated` with `WWW-Authenticate: Bearer`. The reason is never disclosed.
 
-## 5. Personal Access Tokens (Integrations)
+## 4. Logout and Session Revocation
 
-```text
-Authorization: Bearer 12|kM3x...  (shown once on creation, stored as SHA-256 hash)
-```
-
-| Control | Rule |
+| Action | Effect |
 |---|---|
-| Abilities | Subset of the creating user's permissions (`employee.view`, `leave.view`) — never more |
-| Expiry | Required, max 1 year |
-| Scope | Same scope as the user's role assignments; the effective permission is the intersection of token abilities and current user permissions, so revoking a role also limits the token |
-| Audit | `last_used_at`, `last_used_ip`; creation/revocation audited |
-| Restriction | Tokens cannot call identity endpoints (change password, MFA, create tokens) |
+| `POST /auth/logout` | Revokes the refresh-token family (`sid`), puts the access token's `jti` on the deny-list until it expires, clears the cookie |
+| `POST /auth/logout-all` | Increments `users.token_version` (every access token is now invalid) and revokes every refresh token of the user |
+| Password reset | Same as logout-all, plus clears any lockout and marks the e-mail as verified |
+| Admin disables user | Takes effect on the next request: the guard rejects non-active users |
 
-## 6. Password Policy
+Expired refresh tokens are kept for 30 days for investigations, then pruned daily (`model:prune`).
 
-- argon2id (memory 64 MB, time 4, threads 1).
-- Minimum 12 characters; no forced composition rules (NIST 800-63B). Checked against Have I Been Pwned using k-anonymity (`Password::uncompromised()`).
-- Last 5 password hashes cannot be reused.
-- Reset tokens: single-use, 30 min expiry, hashed in DB. All sessions revoked after a password reset.
+## 5. Password Reset
 
-## 7. Logout & Session Management
+1. `POST /auth/forgot-password {email}` → always `202`. Active accounts get an e-mail with a link to `{FRONTEND_URL}/reset-password?token=…&email=…`. Laravel's broker throttles to one e-mail per minute per account.
+2. `POST /auth/reset-password {token, email, password, password_confirmation}` → `204`, or `422 invalid_password_reset_token`.
 
-- `POST /auth/logout` invalidates the session and rotates the CSRF token.
-- `/me/sessions` lists active sessions (device, IP, last activity) from a Redis index per user; users can revoke any session.
-- Admin **disable user** → all sessions and tokens revoked immediately (Redis keys deleted, tokens deleted).
-- **Impersonation** (support): only `platform.support` role, requires a reason, time-limited (30 min), shown with a banner in the UI, every action audited with `impersonator_id`.
+## 6. E-mail Verification
 
-## 8. Authentication Middleware Pipeline
+1. Accounts are created unverified (`php artisan identity:create-user`, and later the user-invite API), and a verification e-mail is sent.
+2. The e-mail link is a **signed, expiring API URL**: `GET /api/v1/auth/email/verify/{id}/{hash}?expires=…&signature=…`. The hash binds the link to the current address.
+3. The API verifies the address and redirects to `{FRONTEND_URL}/email-verified`. An invalid, expired or tampered link redirects to `/email-verification-failed`.
+4. `POST /auth/email/verification-notification` re-sends the link (rate limited).
+
+## 7. Password Policy
+
+- argon2id in deployed environments (memory 64 MB, time 4, threads 1).
+- Minimum 12 characters, maximum 1024, and no composition rules (NIST 800-63B). Passwords are checked against Have I Been Pwned with k-anonymity (`Password::uncompromised()`), so the password itself never leaves the server.
+- *Planned:* the last 5 password hashes cannot be reused.
+
+## 8. Middleware Pipeline
 
 ```text
+global
+ ├─ AssignRequestId           X-Request-Id in/out, shared via Context with logs and jobs
+ └─ SecurityHeaders           HSTS, nosniff, frame DENY; deny-all CSP + no-store on /api
 api (group)
- ├─ AssignRequestId
- ├─ SecurityHeaders           (HSTS, no-sniff, frame-deny; CSP served by CloudFront for SPA)
- ├─ EnsureFrontendRequestsAreStateful   (Sanctum)
- ├─ auth:sanctum
- ├─ ResolveTenant             (from user/token; sets TenantContext + PostgreSQL app.tenant_id)
- ├─ EnsureUserIsActive
- ├─ EnsureMfaVerified
- ├─ ThrottleRequests:api
- └─ (route-level) can:permission / RequireRecentMfa
+ ├─ ForceJsonResponse
+ ├─ SubstituteBindings
+ └─ ThrottleRequests:api      300/min per user (or IP)
+route
+ ├─ auth:api                  JWT guard (above)
+ ├─ "authenticated" group     = auth:api + EnsureEmailIsVerified (used by every non-auth module)
+ ├─ throttle:identity.*       login, refresh, password reset, verification limiters
+ └─ can:<permission>          RBAC gate per permission (docs/07)
 ```
 
-## 9. Threats and Mitigations
+*Planned additions:* `ResolveTenant` (sets PostgreSQL `app.tenant_id`), `EnsureMfaVerified` and `RequireRecentMfa`.
+
+## 9. Planned: MFA and SSO
+
+- **MFA:** TOTP (RFC 6238) with recovery codes. The login response returns `mfa_required` and a short-lived MFA challenge token; `POST /auth/mfa/verify` exchanges it for the token pair. An `amr` claim records the factors used, and step-up checks require recent MFA for sensitive permissions.
+- **SSO (OIDC / SAML):** the authorization-code flow with PKCE ends by issuing the same token pair. With SSO enforced, password login is disabled for the tenant (except a break-glass admin with MFA).
+- **Personal access tokens:** for integrations. They will be scoped to a subset of the user's permissions, expire within a year at most, be stored as hashes and be audited.
+
+## 10. Threats and Mitigations
 
 | Threat | Mitigation |
 |---|---|
-| XSS steals credentials | HttpOnly session cookie, strict CSP, React auto-escaping, no `dangerouslySetInnerHTML` (lint rule) |
-| CSRF | Sanctum XSRF token + `SameSite=Lax` + CORS allow-list |
-| Credential stuffing | Rate limits, lockout, breached-password check, WAF bot rules, MFA |
-| Session hijack | Secure cookies, rotation on privilege change, idle timeout, session list + revoke |
-| Token leakage | Hashed at rest, shown once, expiry, minimal abilities, secret scanning in CI |
-| Cross-tenant login | Users unique per tenant; tenant comes from the login subdomain and is verified against the user record |
+| XSS steals the refresh token | `HttpOnly` cookie, never in the response body |
+| XSS uses the access token | 15-minute lifetime, in-memory only, strict CSP, React escaping, lint ban on `dangerouslySetInnerHTML` |
+| CSRF on `/auth/refresh` | `SameSite=Strict`, cookie path limited to `/api/v1/auth`, CORS allow-list; the response is only readable by the allowed origin |
+| Stolen refresh token | Single-use rotation with family revocation on replay |
+| Forged / altered JWT | Algorithm pinned, signature, `kid`, `iss`, `aud` and time claims verified |
+| Credential stuffing / brute force | Per-account and per-IP rate limits, lockout with owner notification, breached-password check, WAF |
+| User enumeration | Identical errors and timing; forgot-password always 202 |
+| Leaked database | Refresh and reset tokens stored only as hashes; passwords hashed with argon2id |
+| Leaked signing key | `kid` allows rotation; rotating the secret invalidates every access token within 15 minutes |

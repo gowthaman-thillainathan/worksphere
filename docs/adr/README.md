@@ -6,9 +6,10 @@ ADRs record significant decisions, the context they were made in and the trade-o
 |---|---|---|
 | [0001](0001-modular-monolith.md) | Modular monolith instead of microservices | Accepted |
 | [0002](0002-multi-tenancy-rls.md) | Shared-database multi-tenancy with PostgreSQL Row-Level Security | Accepted |
-| [0003](0003-spa-session-auth.md) | Cookie sessions (Sanctum) for the SPA instead of JWT | Accepted |
+| [0003](0003-spa-session-auth.md) | Cookie sessions (Sanctum) for the SPA instead of JWT | Superseded by 0006 |
 | [0004](0004-pragmatic-ddd.md) | Full domain model only where business rules justify it | Accepted |
 | [0005](0005-sqs-queues.md) | Amazon SQS for queues in AWS environments | Accepted |
+| [0006](0006-jwt-access-and-rotating-refresh-tokens.md) | JWT access tokens with rotating refresh tokens | Accepted |
 
 ## Template
 

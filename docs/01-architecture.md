@@ -6,7 +6,7 @@
 
 | Bounded context | Responsibility |
 |---|---|
-| **Identity** | Users, credentials, sessions, MFA, SSO, API tokens |
+| **Identity** | Users, credentials, JWT access tokens, rotating refresh tokens, MFA, SSO |
 | **Tenancy** | Organisations (tenants), subscription settings, feature flags |
 | **Access** | Roles, permissions, scoped role assignments |
 | **Organisation** | Departments (tree), positions, job grades, locations, cost centres |
@@ -173,7 +173,7 @@ sequenceDiagram
 
     SPA->>ALB: PATCH /api/v1/leave-requests/{id}/approve
     ALB->>MW: forward (X-Request-Id)
-    MW->>MW: AssignRequestId → Authenticate (Sanctum)<br/>→ ResolveTenant → SET app.tenant_id<br/>→ RateLimit → EnsureMfaVerified
+    MW->>MW: AssignRequestId → Authenticate (JWT guard)<br/>→ ResolveTenant → SET app.tenant_id<br/>→ RateLimit → EnsureMfaVerified
     MW->>CTRL: request
     CTRL->>CTRL: FormRequest validation
     CTRL->>ACT: ApproveLeaveRequest(dto)

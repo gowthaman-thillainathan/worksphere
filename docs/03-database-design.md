@@ -57,15 +57,18 @@ PostgreSQL 16 on Amazon RDS. One database, one schema (`public`), shared by all 
 | mfa_secret | text NULL | encrypted (app-level) |
 | mfa_enabled_at | ts NULL | |
 | last_login_at | ts NULL | |
+| token_version | int | incremented to invalidate every outstanding JWT (logout-all, password reset) |
 | password_changed_at | ts | password expiry policy |
 | failed_login_count | int | lockout |
 | locked_until | ts NULL | |
 
 **mfa_recovery_codes** — `id`, `user_id`, `code_hash`, `used_at`.
 
-**personal_access_tokens** — Sanctum standard + `tenant_id`, `abilities jsonb`, `expires_at`, `last_used_ip`.
+**refresh_tokens** — `id`, `user_id`, `family_id` (session id, the JWT `sid` claim), `token_hash` (SHA-256, unique), `expires_at`, `revoked_at`, `replaced_by_id` (rotation chain), `ip_address`, `user_agent`. See [ADR-0006](adr/0006-jwt-access-and-rotating-refresh-tokens.md).
 
-**sessions** — stored in Redis (not PostgreSQL); listed here for completeness.
+**password_reset_tokens** — Laravel broker table: `email`, hashed `token`, `created_at`.
+
+**personal_access_tokens** *(planned, integrations)* — `tenant_id`, `user_id`, hashed token, `abilities jsonb`, `expires_at`, `last_used_ip`.
 
 **login_attempts** — `id`, `tenant_id`, `email`, `ip`, `user_agent`, `succeeded`, `failure_reason`, `created_at`. Partitioned monthly; retained 90 days.
 
