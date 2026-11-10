@@ -25,7 +25,7 @@ This repository is a reference implementation. It shows how a production system 
 | Layer | Technology |
 |---|---|
 | Backend | PHP 8.3, Laravel 12, Sanctum, queue workers on Amazon SQS |
-| Frontend | React 18, TypeScript (strict), Vite, TanStack Query, React Router, React Hook Form + Zod, Tailwind CSS, shadcn/ui |
+| Frontend | React 19, TypeScript (strict), Vite, TanStack Query, React Router, React Hook Form + Zod, Tailwind CSS, shadcn/ui |
 | Data | PostgreSQL 16 (RLS, partitioning), Redis 7 (cache, locks, rate limits) |
 | Infrastructure | Docker, AWS ECS Fargate, RDS, ElastiCache, S3, CloudFront, SQS, SES, Secrets Manager, WAF |
 | IaC / CI/CD | Terraform, GitHub Actions (OIDC to AWS), CodeDeploy blue/green |
