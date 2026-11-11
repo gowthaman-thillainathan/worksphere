@@ -46,6 +46,7 @@ This repository is a reference implementation. It shows how a production system 
 | 08 | [Deployment Architecture](docs/08-deployment.md) | AWS topology, environments, CI/CD, zero-downtime migrations, DR |
 | 09 | [Logging & Observability](docs/09-logging-observability.md) | Structured logs, correlation, tracing, metrics, audit trail |
 | 10 | [Testing Strategy](docs/10-testing-strategy.md) | Test pyramid, tooling, quality gates, test data |
+| 11 | [Frontend Architecture](docs/11-frontend-architecture.md) | React app structure, API layer, auth flow, state management, components |
 | — | [Architecture Decision Records](docs/adr/README.md) | Key decisions and their trade-offs |
 
 ## Getting Started (API)
@@ -75,6 +76,40 @@ composer test            # Pest, in parallel
 ./vendor/bin/pint --test # code style
 ```
 
+## Getting Started (Web)
+
+**Requirements:** Node.js 22+, with the API running on `http://127.0.0.1:8000`.
+
+```bash
+cd apps/web
+npm install
+npm run dev        # http://localhost:5173 — proxies /api to the Laravel API
+```
+
+| Command | Purpose |
+|---|---|
+| `npm run api:generate` | Regenerate the typed client from `packages/api-contract/spec/openapi.yaml` |
+| `npm run lint` / `npm run typecheck` | ESLint (incl. accessibility rules) and strict TypeScript |
+| `npm test` | Vitest + Testing Library + MSW |
+| `npm run test:e2e` | Playwright against the running API and app (see [docs/11 §9](docs/11-frontend-architecture.md#9-local-development)) |
+| `npm run build` | Production build with per-page code splitting |
+
+## Frontend at a Glance
+
+- **Stack:** React 19 · TypeScript (strict) · Vite · React Router 7 · TanStack Query · React Hook Form + Zod · Tailwind CSS 4 + shadcn/ui (Radix) · Axios with an **Orval client generated from the OpenAPI contract**.
+- **Auth:** the access token lives in memory only, and the refresh token in an HttpOnly cookie. Refresh is silent; concurrent 401s share one refresh (serialised across tabs with Web Locks) and are retried automatically. When a session ends, the user is redirected to sign-in and returned to their page afterwards.
+- **Permissions:** navigation, pages, widgets and actions follow the permissions in `/me`. No role names are hard-coded.
+- **Screens:**
+  - dashboard with headcount, departments, recent employees, quick actions and recent activity;
+  - employee directory with search, filters, sorting, cursor paging and URL-synced state;
+  - employee details, create and edit (server errors on fields, optimistic locking), photo upload, soft delete and restore (optimistic), audit history;
+  - departments, roles and settings (theme, sign out everywhere).
+- **Quality:**
+  - lazy-loaded pages with Suspense, skeletons, empty and error states;
+  - keyboard and screen-reader support;
+  - mobile, tablet and desktop layouts; light, dark and system themes;
+  - tests at three levels: unit, integration (MSW) and E2E (Playwright, desktop + mobile).
+
 ## Authentication at a Glance
 
 | Endpoint | Purpose |
@@ -96,6 +131,8 @@ composer test            # Pest, in parallel
 | `DELETE /api/v1/employees/{id}` · `POST …/restore` | Soft delete and restore, blocked while the employee still has direct reports |
 | `GET` · `POST` · `DELETE /api/v1/employees/{id}/photo` | Profile photo: content-sniffed image upload, private storage, streamed only to authorised users |
 | `GET /api/v1/audit-events` | Hash-chained, tamper-evident audit trail of every change, with personal data masked |
+| `GET` · `POST` · `PATCH` · `DELETE /api/v1/departments[/{id}]` | Department tree with unique codes, cycle protection and delete guards |
+| `GET /api/v1/employees/headcount` | Active employees in total and per status |
 
 Personal data (`personal_email`, `phone`, `date_of_birth`) is encrypted at rest. It is only returned with `employee.view.sensitive` and only writable with `employee.update.sensitive`.
 
@@ -106,7 +143,7 @@ Errors follow RFC 9457 (`application/problem+json`) with stable `code`s and a `r
 | Phase | Scope |
 |---|---|
 | **1 — Foundation** | Monorepo, Docker dev environment, CI pipeline, Identity (✅ JWT auth, password reset, e-mail verification; MFA next), Tenancy, RBAC (✅ roles & permissions; scopes next), Audit (✅ hash-chained trail) |
-| **2 — Core HR** | Organisation (departments, positions, locations), Employee profiles (✅ CRUD, search, photos, soft delete), Documents |
+| **2 — Core HR** | Organisation (✅ departments; positions, locations next), Employee profiles (✅ CRUD, search, photos, soft delete), Documents, **Web app (✅ foundation, auth, dashboard, employees, departments, roles, settings)** |
 | **3 — Time** | Leave policies and requests with approval workflow, Attendance |
 | **4 — Compensation** | Salary history, bands, field-level protection |
 | **5 — Production** | Terraform for AWS, blue/green deploys, dashboards, load tests, runbooks |

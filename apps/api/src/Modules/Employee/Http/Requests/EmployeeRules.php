@@ -54,6 +54,7 @@ final class EmployeeRules
             'hire_date' => [...$presence, self::DATE_FORMAT],
             'termination_date' => ['sometimes', 'nullable', self::DATE_FORMAT],
             'manager_id' => ['sometimes', 'nullable', 'uuid'],
+            'department_id' => ['sometimes', 'nullable', 'uuid'],
             'personal_email' => ['sometimes', 'nullable', 'string', 'email:rfc', 'max:255'],
             'phone' => ['sometimes', 'nullable', 'string', self::PHONE_PATTERN],
             'date_of_birth' => ['sometimes', 'nullable', self::DATE_FORMAT, self::MINIMUM_AGE],

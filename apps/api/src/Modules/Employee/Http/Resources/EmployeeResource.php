@@ -53,6 +53,7 @@ final class EmployeeResource extends JsonResource
                 'id' => $this->manager->id,
                 'display_name' => $this->manager->displayName(),
             ]),
+            'department_id' => $this->department_id,
             'photo_url' => $this->hasPhoto() && ! $this->trashed() ? route('employees.photo.show', $this->id) : null,
             $this->mergeWhen($this->canSee($request), fn (): array => [
                 'personal_email' => $this->personal_email,

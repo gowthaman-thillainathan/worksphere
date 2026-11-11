@@ -142,8 +142,8 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 
 | Method | Path | Permission |
 |---|---|---|
-| GET / POST | `/departments` | `organisation.view` / `organisation.manage` |
-| GET / PATCH / DELETE | `/departments/{id}` | same |
+| GET / POST | `/departments` ✅ | `organisation.view` / `organisation.manage` — full list with `meta.total` |
+| GET / PATCH / DELETE | `/departments/{id}` ✅ | same; PATCH/DELETE require `If-Match`; DELETE refused while sub-departments or employees exist |
 | GET | `/departments/{id}/tree` | `organisation.view` |
 | POST | `/departments/{id}/move` | `organisation.manage` |
 | CRUD | `/positions`, `/job-grades`, `/locations`, `/cost-centres` | `organisation.*` |
@@ -152,6 +152,7 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 
 | Method | Path | Permission |
 |---|---|---|
+| GET | `/employees/headcount` ✅ | `employee.view` — total and per status (dashboard) |
 | GET | `/employees` ✅ | `employee.view` — `q`, `filter[status\|employment_type\|manager_id\|hire_date][gte\|lte]\|trashed]`, `sort`, cursor pagination |
 | POST | `/employees` ✅ | `employee.create` (+ `employee.update.sensitive` for PII fields) |
 | GET | `/employees/{id}` ✅ | `employee.view` (PII only with `employee.view.sensitive`) |

@@ -46,3 +46,14 @@ it('enforces the password policy', function (): void {
 
     $this->assertDatabaseMissing('users', ['email' => 'ada@meridian.test']);
 });
+
+it('can provision an already verified account without e-mailing it', function (): void {
+    $this->artisan('identity:create-user', ['email' => 'ops@meridian.test', '--name' => 'Ops', '--verified' => true])
+        ->expectsQuestion('Password', 'a-long-enough-passphrase')
+        ->assertSuccessful();
+
+    $user = User::query()->where('email', 'ops@meridian.test')->sole();
+
+    expect($user->hasVerifiedEmail())->toBeTrue();
+    Notification::assertNotSentTo($user, VerifyEmailNotification::class);
+});

@@ -38,6 +38,14 @@ interface EmployeeRepository
     public function hasActiveDirectReports(string $employeeId): bool;
 
     /**
+     * Active (not deleted) employees per status, every status included,
+     * e.g. ['active' => 41, 'on_leave' => 3, ...].
+     *
+     * @return array<string, int>
+     */
+    public function countByStatus(): array;
+
+    /**
      * Atomically reserves the next employee number sequence value.
      */
     public function nextSequenceValue(): int;

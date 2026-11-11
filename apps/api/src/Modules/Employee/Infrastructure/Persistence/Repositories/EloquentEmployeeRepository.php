@@ -99,6 +99,17 @@ final class EloquentEmployeeRepository implements EmployeeRepository
         return Employee::query()->where('manager_id', $employeeId)->exists();
     }
 
+    public function countByStatus(): array
+    {
+        $counts = [];
+
+        foreach (EmployeeStatus::cases() as $status) {
+            $counts[$status->value] = Employee::query()->where('status', $status->value)->count();
+        }
+
+        return $counts;
+    }
+
     public function nextSequenceValue(): int
     {
         $sequence = EmployeeNumberSequence::query()->lockForUpdate()->findOrFail(EmployeeNumberSequence::EMPLOYEES);
@@ -135,6 +146,7 @@ final class EloquentEmployeeRepository implements EmployeeRepository
                 array_map(static fn (EmploymentType $type): string => $type->value, $criteria->employmentTypes),
             ))
             ->when($criteria->managerId, static fn (Builder $query, string $managerId) => $query->where('manager_id', $managerId))
+            ->when($criteria->departmentId, static fn (Builder $query, string $departmentId) => $query->where('department_id', $departmentId))
             ->when($criteria->hiredFrom, static fn (Builder $query, $from) => $query->whereDate('hire_date', '>=', $from))
             ->when($criteria->hiredTo, static fn (Builder $query, $to) => $query->whereDate('hire_date', '<=', $to));
     }
