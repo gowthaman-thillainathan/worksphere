@@ -10,6 +10,8 @@ ADRs record significant decisions, the context they were made in and the trade-o
 | [0004](0004-pragmatic-ddd.md) | Full domain model only where business rules justify it | Accepted |
 | [0005](0005-sqs-queues.md) | Amazon SQS for queues in AWS environments | Accepted |
 | [0006](0006-jwt-access-and-rotating-refresh-tokens.md) | JWT access tokens with rotating refresh tokens | Accepted |
+| [0007](0007-employee-sign-in-accounts.md) | Employee sign-in accounts by invitation, owned by Identity | Accepted |
+| [0008](0008-denormalised-department-name.md) | Copy of the department name on employees for sorting | Accepted |
 
 ## Template
 

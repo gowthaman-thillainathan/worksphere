@@ -23,7 +23,7 @@ arch('the shared domain kernel is framework free')
 /*
 | Modules talk to each other only through their public Contracts namespace.
 */
-const MODULES = ['Access', 'Audit', 'Employee', 'Identity'];
+const MODULES = ['Access', 'Audit', 'Documents', 'Employee', 'Identity', 'Organisation'];
 const MODULE_INTERNALS = ['Domain', 'Application', 'Infrastructure', 'Http'];
 
 foreach (MODULES as $module) {
@@ -42,7 +42,15 @@ foreach (MODULES as $module) {
 
 arch('the Access and Audit modules are independent of business modules')
     ->expect(['Meridian\Modules\Access', 'Meridian\Modules\Audit'])
-    ->not->toUse(['Meridian\Modules\Identity', 'Meridian\Modules\Employee']);
+    ->not->toUse(['Meridian\Modules\Identity', 'Meridian\Modules\Employee', 'Meridian\Modules\Organisation', 'Meridian\Modules\Documents']);
+
+arch('the Employee module does not depend on modules that reference it')
+    ->expect('Meridian\Modules\Employee')
+    ->not->toUse('Meridian\Modules\Documents');
+
+arch('the Organisation module does not depend on modules that reference it')
+    ->expect('Meridian\Modules\Organisation')
+    ->not->toUse('Meridian\Modules\Employee');
 
 arch('the shared kernel does not depend on modules')
     ->expect('Meridian\Shared')

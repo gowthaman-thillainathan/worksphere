@@ -157,64 +157,16 @@ Leave/
 
 ## 3. Frontend — `apps/web`
 
-Feature-sliced structure: code is grouped by business feature, not by technical type.
+The implemented structure, the API layer, authentication, state management and component design are documented in **[11 — Frontend Architecture](11-frontend-architecture.md)**.
 
-```text
-apps/web/
-├── public/
-├── src/
-│   ├── app/                          # application shell
-│   │   ├── main.tsx
-│   │   ├── App.tsx
-│   │   ├── router.tsx                # route tree, lazy-loaded feature routes
-│   │   ├── providers/                # QueryClientProvider, AuthProvider, ThemeProvider, I18nProvider
-│   │   └── layouts/                  # AppLayout, AuthLayout
-│   ├── features/
-│   │   ├── auth/
-│   │   │   ├── api/                  # useLogin, useMfaVerify, useMe
-│   │   │   ├── components/           # LoginForm, MfaChallenge
-│   │   │   ├── routes/               # LoginPage, ForgotPasswordPage
-│   │   │   └── index.ts              # public surface of the feature
-│   │   ├── employees/
-│   │   │   ├── api/                  # useEmployees, useEmployee, useUpdateEmployee (TanStack Query)
-│   │   │   ├── components/           # EmployeeTable, EmployeeForm, OrgChart
-│   │   │   ├── routes/               # EmployeeListPage, EmployeeDetailPage
-│   │   │   ├── schemas/              # Zod schemas
-│   │   │   └── index.ts
-│   │   ├── leave/
-│   │   ├── attendance/
-│   │   ├── organisation/
-│   │   ├── compensation/
-│   │   ├── documents/
-│   │   └── admin/                    # roles, permissions, tenant settings, audit viewer
-│   ├── shared/
-│   │   ├── ui/                       # design-system components (shadcn/ui based)
-│   │   ├── components/               # DataTable, PageHeader, EmptyState, ErrorBoundary
-│   │   ├── auth/                     # <Can>, usePermission, RequireAuth
-│   │   ├── hooks/                    # useDebounce, usePagination
-│   │   ├── lib/
-│   │   │   ├── http.ts               # fetch wrapper: CSRF, request id, problem+json parsing
-│   │   │   ├── query-client.ts
-│   │   │   └── format.ts             # dates, money (tenant locale)
-│   │   ├── api-types/                # generated from packages/api-contract
-│   │   └── i18n/
-│   ├── test/                         # test utils, MSW handlers, render helpers
-│   └── styles/
-├── e2e/ → ../../tests/e2e            # symlinked for IDE convenience
-├── eslint.config.js                  # incl. eslint-plugin-boundaries (features can't import each other's internals)
-├── vite.config.ts
-├── vitest.config.ts
-├── tsconfig.json                     # strict: true, noUncheckedIndexedAccess
-└── package.json
-```
+In short:
+- `app/` holds bootstrap and routes; `layouts/` the shell; `routes/` the guards and paths.
+- `features/<area>/` is one folder per business area, each with its pages, components, hooks and schemas.
+- `components/` is the design system; `hooks/` and `shared/` hold generic hooks and helpers.
+- `services/` holds the API client and one service per resource; `services/api/generated/` is the Orval output, never edited by hand.
+- `types/` holds the permission keys and re-exported API types.
 
-### Frontend import rules (enforced by `eslint-plugin-boundaries`)
-
-| From | May import |
-|---|---|
-| `app/` | `features/*/index.ts`, `shared/*` |
-| `features/x` | its own files, `shared/*`, other features **only via** their `index.ts` |
-| `shared/` | `shared/*` only — never `features` |
+Only the service layer may import the generated client; ESLint enforces this.
 
 ## 4. Naming Conventions
 

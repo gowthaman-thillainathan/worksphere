@@ -22,7 +22,7 @@ final class AuditEventResource extends JsonResource
             'id' => $this->id,
             'type' => 'audit_event',
             'occurred_at' => $this->occurred_at->toIso8601ZuluString(),
-            'actor' => ['type' => $this->actor_type->value, 'id' => $this->actor_id],
+            'actor' => ['type' => $this->actor_type->value, 'id' => $this->actor_id, 'name' => $this->resource->actorName],
             'action' => $this->action,
             'subject' => ['type' => $this->subject_type, 'id' => $this->subject_id],
             'changes' => (object) $this->changes,

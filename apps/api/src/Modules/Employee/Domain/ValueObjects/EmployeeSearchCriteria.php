@@ -10,7 +10,8 @@ use Meridian\Shared\Domain\ValueObjects\SortDirection;
 /**
  * Everything a client can ask of the employee directory: free-text search,
  * filters (values within one filter are OR-ed, filters are AND-ed), sort
- * order and cursor pagination.
+ * order and cursor pagination. Text filters are case-insensitive substring
+ * matches on one field each.
  */
 final readonly class EmployeeSearchCriteria
 {
@@ -26,9 +27,14 @@ final readonly class EmployeeSearchCriteria
      */
     public function __construct(
         public ?string $search = null,
+        public ?string $name = null,
+        public ?string $employeeNumber = null,
+        public ?string $workEmail = null,
+        public ?string $jobTitle = null,
         public array $statuses = [],
         public array $employmentTypes = [],
         public ?string $managerId = null,
+        public ?string $departmentId = null,
         public ?DateTimeImmutable $hiredFrom = null,
         public ?DateTimeImmutable $hiredTo = null,
         public TrashedFilter $trashed = TrashedFilter::Without,

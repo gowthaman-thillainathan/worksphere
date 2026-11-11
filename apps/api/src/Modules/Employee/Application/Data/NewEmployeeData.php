@@ -10,6 +10,9 @@ use Meridian\Modules\Employee\Domain\ValueObjects\EmploymentType;
 
 final readonly class NewEmployeeData
 {
+    /**
+     * @param  string|null  $accountRole  When set, a sign-in account with this role is created too.
+     */
     public function __construct(
         public string $firstName,
         public string $lastName,
@@ -21,9 +24,11 @@ final readonly class NewEmployeeData
         public ?string $preferredName = null,
         public ?DateTimeImmutable $terminationDate = null,
         public ?string $managerId = null,
+        public ?string $departmentId = null,
         public ?string $personalEmail = null,
         public ?string $phone = null,
         public ?string $dateOfBirth = null,
+        public ?string $accountRole = null,
     ) {}
 
     /**
@@ -42,6 +47,7 @@ final readonly class NewEmployeeData
             'hire_date' => $this->hireDate,
             'termination_date' => $this->terminationDate,
             'manager_id' => $this->managerId,
+            'department_id' => $this->departmentId,
             'personal_email' => $this->personalEmail,
             'phone' => $this->phone,
             'date_of_birth' => $this->dateOfBirth,

@@ -42,4 +42,10 @@ final class EloquentUserRepository implements UserRepository
     {
         return mb_strtolower(trim($email));
     }
+
+    public function namesByIds(array $ids): array
+    {
+        /** @var array<string, string> */
+        return User::query()->whereKey($ids)->pluck('name', 'id')->all();
+    }
 }

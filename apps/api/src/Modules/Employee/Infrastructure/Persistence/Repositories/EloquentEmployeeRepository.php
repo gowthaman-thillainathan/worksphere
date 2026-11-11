@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Meridian\Modules\Employee\Infrastructure\Persistence\Repositories;
 
 use Illuminate\Database\Eloquent\Builder;
+use Meridian\Modules\Employee\Contracts\EmployeeDirectory;
 use Meridian\Modules\Employee\Domain\Repositories\EmployeeRepository;
 use Meridian\Modules\Employee\Domain\ValueObjects\EmployeeSearchCriteria;
 use Meridian\Modules\Employee\Domain\ValueObjects\EmployeeStatus;
@@ -14,11 +15,13 @@ use Meridian\Modules\Employee\Infrastructure\Persistence\Models\Employee;
 use Meridian\Modules\Employee\Infrastructure\Persistence\Models\EmployeeNumberSequence;
 use Meridian\Shared\Domain\ValueObjects\CursorPage;
 
-final class EloquentEmployeeRepository implements EmployeeRepository
+final class EloquentEmployeeRepository implements EmployeeDirectory, EmployeeRepository
 {
     private const MANAGER_COLUMNS = 'manager:id,first_name,last_name,preferred_name';
 
-    private const SEARCH_COLUMNS = ['first_name', 'last_name', 'preferred_name', 'employee_number', 'work_email'];
+    private const NAME_COLUMNS = ['first_name', 'last_name', 'preferred_name'];
+
+    private const SEARCH_COLUMNS = [...self::NAME_COLUMNS, 'employee_number', 'work_email'];
 
     private const CASE_INSENSITIVE_LIKE = 'ilike';
 
@@ -46,10 +49,14 @@ final class EloquentEmployeeRepository implements EmployeeRepository
 
         $this->applyTrashed($query, $criteria->trashed);
         $this->applyFilters($query, $criteria);
-        $this->applySearch($query, $criteria->search);
+        $this->applyContains($query, self::SEARCH_COLUMNS, $criteria->search);
+        $this->applyContains($query, self::NAME_COLUMNS, $criteria->name);
+        $this->applyContains($query, ['employee_number'], $criteria->employeeNumber);
+        $this->applyContains($query, ['work_email'], $criteria->workEmail);
+        $this->applyContains($query, ['job_title'], $criteria->jobTitle);
 
         foreach ($criteria->sort as $sort) {
-            $query->orderBy($sort->field->value, $sort->direction->value);
+            $query->orderBy($sort->field->column(), $sort->direction->value);
         }
 
         $paginator = $query->orderBy(self::TIE_BREAKER)->cursorPaginate(perPage: $criteria->perPage, cursor: $criteria->cursor);
@@ -65,6 +72,11 @@ final class EloquentEmployeeRepository implements EmployeeRepository
         );
     }
 
+    public function isActive(string $employeeId): bool
+    {
+        return Employee::query()->whereKey($employeeId)->exists();
+    }
+
     public function save(Employee $employee): void
     {
         $employee->save();
@@ -72,6 +84,8 @@ final class EloquentEmployeeRepository implements EmployeeRepository
 
     public function softDelete(Employee $employee): void
     {
+        // Eloquent's soft delete only writes deleted_at; persist the other changes first.
+        $employee->save();
         $employee->delete();
     }
 
@@ -99,6 +113,17 @@ final class EloquentEmployeeRepository implements EmployeeRepository
         return Employee::query()->where('manager_id', $employeeId)->exists();
     }
 
+    public function countByStatus(): array
+    {
+        $counts = [];
+
+        foreach (EmployeeStatus::cases() as $status) {
+            $counts[$status->value] = Employee::query()->where('status', $status->value)->count();
+        }
+
+        return $counts;
+    }
+
     public function nextSequenceValue(): int
     {
         $sequence = EmployeeNumberSequence::query()->lockForUpdate()->findOrFail(EmployeeNumberSequence::EMPLOYEES);
@@ -106,6 +131,15 @@ final class EloquentEmployeeRepository implements EmployeeRepository
         $sequence->save();
 
         return $sequence->last_value;
+    }
+
+    public function renameDepartment(string $departmentId, string $name): int
+    {
+        return Employee::query()
+            ->withTrashed()
+            ->where('department_id', $departmentId)
+            ->toBase()
+            ->update(['department_name' => $name]);
     }
 
     /**
@@ -135,23 +169,26 @@ final class EloquentEmployeeRepository implements EmployeeRepository
                 array_map(static fn (EmploymentType $type): string => $type->value, $criteria->employmentTypes),
             ))
             ->when($criteria->managerId, static fn (Builder $query, string $managerId) => $query->where('manager_id', $managerId))
+            ->when($criteria->departmentId, static fn (Builder $query, string $departmentId) => $query->where('department_id', $departmentId))
             ->when($criteria->hiredFrom, static fn (Builder $query, $from) => $query->whereDate('hire_date', '>=', $from))
             ->when($criteria->hiredTo, static fn (Builder $query, $to) => $query->whereDate('hire_date', '<=', $to));
     }
 
     /**
-     * Case-insensitive substring match on name, number and work e-mail.
+     * Case-insensitive substring match on any of the columns. LIKE wildcards
+     * in the input are escaped, so they match literally.
      *
      * @param  Builder<Employee>  $query
+     * @param  list<string>  $columns
      */
-    private function applySearch(Builder $query, ?string $search): void
+    private function applyContains(Builder $query, array $columns, ?string $value): void
     {
-        if ($search === null || trim($search) === '') {
+        if ($value === null || trim($value) === '') {
             return;
         }
 
-        $pattern = '%'.addcslashes(trim($search), '\\%_').'%';
+        $pattern = '%'.addcslashes(trim($value), '\\%_').'%';
 
-        $query->whereAny(self::SEARCH_COLUMNS, self::CASE_INSENSITIVE_LIKE, $pattern);
+        $query->whereAny($columns, self::CASE_INSENSITIVE_LIKE, $pattern);
     }
 }

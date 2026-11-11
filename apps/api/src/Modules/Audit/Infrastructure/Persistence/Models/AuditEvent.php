@@ -37,6 +37,11 @@ final class AuditEvent extends Model
     protected $table = 'audit_events';
 
     /**
+     * Resolved for display (ActorDirectory); not stored.
+     */
+    public ?string $actorName = null;
+
+    /**
      * @var list<string>
      */
     protected $guarded = ['id'];

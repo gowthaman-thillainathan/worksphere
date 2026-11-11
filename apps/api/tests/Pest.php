@@ -50,10 +50,20 @@ function refreshCookieName(): string
  */
 function userWithRole(?string $role): User
 {
+    return userWithRoles($role === null ? [] : [$role]);
+}
+
+/**
+ * A verified user holding every given system role.
+ *
+ * @param  list<string>  $roles
+ */
+function userWithRoles(array $roles): User
+{
     app(SyncPermissions::class)->handle();
     $user = User::factory()->create();
 
-    if ($role !== null) {
+    foreach ($roles as $role) {
         app(RoleAssigner::class)->assign($user->id, $role);
     }
 
@@ -63,4 +73,12 @@ function userWithRole(?string $role): User
 function tokenForRole(?string $role): string
 {
     return issueTokensFor(userWithRole($role))->accessToken;
+}
+
+/**
+ * @param  list<string>  $roles
+ */
+function tokenForRoles(array $roles): string
+{
+    return issueTokensFor(userWithRoles($roles))->accessToken;
 }

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Meridian\Modules\Employee\Domain\ValueObjects;
 
 /**
- * Sortable fields. Every one is NOT NULL and indexed, which cursor
- * pagination requires.
+ * Sortable fields, by API name. Every column is NOT NULL and indexed, which
+ * cursor pagination requires.
  */
 enum EmployeeSortField: string
 {
@@ -15,4 +15,16 @@ enum EmployeeSortField: string
     case LastName = 'last_name';
     case HireDate = 'hire_date';
     case CreatedAt = 'created_at';
+    case Department = 'department';
+
+    /**
+     * The column that holds the field.
+     */
+    public function column(): string
+    {
+        return match ($this) {
+            self::Department => 'department_name',
+            default => $this->value,
+        };
+    }
 }

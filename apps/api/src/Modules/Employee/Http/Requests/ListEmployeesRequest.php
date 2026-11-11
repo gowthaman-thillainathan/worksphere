@@ -26,6 +26,8 @@ final class ListEmployeesRequest extends FormRequest
 {
     private const DATE_FORMAT = 'date_format:Y-m-d';
 
+    private const TEXT_FILTER = ['sometimes', 'string', 'max:100'];
+
     /**
      * @return array<string, list<mixed>>
      */
@@ -33,10 +35,15 @@ final class ListEmployeesRequest extends FormRequest
     {
         return [
             'q' => ['sometimes', 'string', 'max:100'],
-            'filter' => ['sometimes', 'array:status,employment_type,manager_id,hire_date,trashed'],
+            'filter' => ['sometimes', 'array:name,employee_number,email,job_title,status,employment_type,manager_id,department_id,hire_date,trashed'],
+            'filter.name' => self::TEXT_FILTER,
+            'filter.employee_number' => self::TEXT_FILTER,
+            'filter.email' => self::TEXT_FILTER,
+            'filter.job_title' => self::TEXT_FILTER,
             'filter.status' => ['sometimes', 'string', self::csvOf(EmployeeStatus::class)],
             'filter.employment_type' => ['sometimes', 'string', self::csvOf(EmploymentType::class)],
             'filter.manager_id' => ['sometimes', 'uuid'],
+            'filter.department_id' => ['sometimes', 'uuid'],
             'filter.hire_date' => ['sometimes', 'array:gte,lte'],
             'filter.hire_date.gte' => ['sometimes', self::DATE_FORMAT],
             'filter.hire_date.lte' => ['sometimes', self::DATE_FORMAT],
@@ -51,9 +58,14 @@ final class ListEmployeesRequest extends FormRequest
     {
         return new EmployeeSearchCriteria(
             search: $this->input('q'),
+            name: $this->input('filter.name'),
+            employeeNumber: $this->input('filter.employee_number'),
+            workEmail: $this->input('filter.email'),
+            jobTitle: $this->input('filter.job_title'),
             statuses: array_map(EmployeeStatus::from(...), QueryString::list((string) $this->input('filter.status', ''))),
             employmentTypes: array_map(EmploymentType::from(...), QueryString::list((string) $this->input('filter.employment_type', ''))),
             managerId: $this->input('filter.manager_id'),
+            departmentId: $this->input('filter.department_id'),
             hiredFrom: $this->date('filter.hire_date.gte')?->toImmutable(),
             hiredTo: $this->date('filter.hire_date.lte')?->toImmutable(),
             trashed: TrashedFilter::tryFrom((string) $this->input('filter.trashed')) ?? TrashedFilter::Without,

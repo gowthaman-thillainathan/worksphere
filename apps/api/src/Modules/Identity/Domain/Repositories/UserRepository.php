@@ -17,6 +17,12 @@ interface UserRepository
     public function save(User $user): void;
 
     /**
+     * @param  list<string>  $ids
+     * @return array<string, string> id => name, for existing users
+     */
+    public function namesByIds(array $ids): array;
+
+    /**
      * Atomically increments the failed-login counter.
      *
      * @return int The counter value after the increment.

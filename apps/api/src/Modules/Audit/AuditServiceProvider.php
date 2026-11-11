@@ -8,9 +8,11 @@ use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Meridian\Modules\Audit\Application\Actions\RecordAuditEvent;
+use Meridian\Modules\Audit\Contracts\ActorDirectory;
 use Meridian\Modules\Audit\Contracts\AuditRecorder;
 use Meridian\Modules\Audit\Domain\Repositories\AuditEventRepository;
 use Meridian\Modules\Audit\Domain\Services\AuditContext;
+use Meridian\Modules\Audit\Infrastructure\Actors\AnonymousActorDirectory;
 use Meridian\Modules\Audit\Infrastructure\Console\VerifyAuditChainCommand;
 use Meridian\Modules\Audit\Infrastructure\Context\RequestAuditContext;
 use Meridian\Modules\Audit\Infrastructure\Persistence\Repositories\EloquentAuditEventRepository;
@@ -28,6 +30,12 @@ final class AuditServiceProvider extends ServiceProvider
         AuditEventRepository::class => EloquentAuditEventRepository::class,
         AuditContext::class => RequestAuditContext::class,
     ];
+
+    public function register(): void
+    {
+        // Identity provides real names; keep its binding when it registered first.
+        $this->app->bindIf(ActorDirectory::class, AnonymousActorDirectory::class);
+    }
 
     public function boot(Config $config): void
     {

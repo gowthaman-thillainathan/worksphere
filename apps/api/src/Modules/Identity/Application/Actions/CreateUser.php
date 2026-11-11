@@ -45,6 +45,7 @@ final readonly class CreateUser
                 'status' => UserStatus::Active,
             ]);
             $user->password_changed_at = CarbonImmutable::now();
+            $user->email_verified_at = $data->emailVerified ? CarbonImmutable::now() : null;
             $this->users->save($user);
 
             foreach ($data->roleKeys as $roleKey) {

@@ -18,6 +18,14 @@ final readonly class FrontendUrls
         return $this->url('reset_password').'?'.http_build_query(['token' => $token, 'email' => $email]);
     }
 
+    /**
+     * The reset page in "set your password" mode, for invited accounts.
+     */
+    public function acceptInvitation(string $token, string $email): string
+    {
+        return $this->url('reset_password').'?'.http_build_query(['token' => $token, 'email' => $email, 'invited' => 1]);
+    }
+
     public function forgotPassword(): string
     {
         return $this->url('forgot_password');

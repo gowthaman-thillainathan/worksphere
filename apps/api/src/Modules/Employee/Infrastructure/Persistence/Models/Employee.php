@@ -20,8 +20,7 @@ use Meridian\Modules\Employee\Domain\ValueObjects\EmploymentType;
  * Employee profile. Personal data is encrypted at rest with the application
  * key (docs/03 §5); a database dump alone does not reveal it.
  *
- * Department, location and position links arrive with the Organisation
- * module (expand migration).
+ * Location and position links arrive with later Organisation work.
  *
  * @property string $id
  * @property string $employee_number
@@ -38,6 +37,10 @@ use Meridian\Modules\Employee\Domain\ValueObjects\EmploymentType;
  * @property CarbonImmutable $hire_date
  * @property CarbonImmutable|null $termination_date
  * @property string|null $manager_id
+ * @property string|null $department_id
+ * @property string $department_name Copy of the department name, for sorting
+ * @property string|null $user_id Sign-in account, if any
+ * @property string|null $deletion_reason
  * @property string|null $photo_path
  * @property string|null $photo_mime_type
  * @property int $version
@@ -65,7 +68,7 @@ final class Employee extends Model
      */
     public const EDITABLE_FIELDS = [
         'first_name', 'last_name', 'preferred_name', 'work_email', 'job_title',
-        'employment_type', 'status', 'hire_date', 'termination_date', 'manager_id',
+        'employment_type', 'status', 'hire_date', 'termination_date', 'manager_id', 'department_id',
         ...self::SENSITIVE_FIELDS,
     ];
 
@@ -88,6 +91,7 @@ final class Employee extends Model
      */
     protected $attributes = [
         'version' => 1,
+        'department_name' => '',
     ];
 
     public function displayName(): string
