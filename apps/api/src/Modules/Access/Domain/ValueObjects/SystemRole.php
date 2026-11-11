@@ -62,6 +62,7 @@ enum SystemRole: string
                 Permission::EmployeeTransfer,
                 Permission::EmployeeTerminate,
                 Permission::EmployeeExport,
+                Permission::EmployeeDelete,
                 Permission::OrganisationView,
                 Permission::OrganisationManage,
                 Permission::LeaveView,

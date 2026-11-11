@@ -98,6 +98,7 @@ final readonly class ApiExceptionRenderer
             ErrorCategory::Forbidden => Response::HTTP_FORBIDDEN,
             ErrorCategory::NotFound => Response::HTTP_NOT_FOUND,
             ErrorCategory::Conflict => Response::HTTP_CONFLICT,
+            ErrorCategory::PreconditionFailed => Response::HTTP_PRECONDITION_FAILED,
         };
     }
 

@@ -20,18 +20,29 @@ arch('the shared domain kernel is framework free')
     ->expect('Meridian\Shared\Domain')
     ->not->toUse(['Illuminate', 'Laravel']);
 
-arch('the Identity module only uses the public contracts of Access')
-    ->expect('Meridian\Modules\Identity')
-    ->not->toUse([
-        'Meridian\Modules\Access\Domain',
-        'Meridian\Modules\Access\Application',
-        'Meridian\Modules\Access\Infrastructure',
-        'Meridian\Modules\Access\Http',
-    ]);
+/*
+| Modules talk to each other only through their public Contracts namespace.
+*/
+const MODULES = ['Access', 'Audit', 'Employee', 'Identity'];
+const MODULE_INTERNALS = ['Domain', 'Application', 'Infrastructure', 'Http'];
 
-arch('the Access module does not depend on Identity')
-    ->expect('Meridian\Modules\Access')
-    ->not->toUse('Meridian\Modules\Identity');
+foreach (MODULES as $module) {
+    $otherModulesInternals = [];
+
+    foreach (array_diff(MODULES, [$module]) as $other) {
+        foreach (MODULE_INTERNALS as $layer) {
+            $otherModulesInternals[] = "Meridian\\Modules\\{$other}\\{$layer}";
+        }
+    }
+
+    arch("the {$module} module only uses other modules' contracts")
+        ->expect("Meridian\\Modules\\{$module}")
+        ->not->toUse($otherModulesInternals);
+}
+
+arch('the Access and Audit modules are independent of business modules')
+    ->expect(['Meridian\Modules\Access', 'Meridian\Modules\Audit'])
+    ->not->toUse(['Meridian\Modules\Identity', 'Meridian\Modules\Employee']);
 
 arch('the shared kernel does not depend on modules')
     ->expect('Meridian\Shared')

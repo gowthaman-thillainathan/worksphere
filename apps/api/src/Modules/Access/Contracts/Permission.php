@@ -20,6 +20,7 @@ enum Permission: string
     case EmployeeTransfer = 'employee.transfer';
     case EmployeeTerminate = 'employee.terminate';
     case EmployeeExport = 'employee.export';
+    case EmployeeDelete = 'employee.delete';
 
     case OrganisationView = 'organisation.view';
     case OrganisationManage = 'organisation.manage';
@@ -92,6 +93,7 @@ enum Permission: string
             self::EmployeeTransfer => 'Transfer employees between positions and departments.',
             self::EmployeeTerminate => 'Terminate employment.',
             self::EmployeeExport => 'Export employee data.',
+            self::EmployeeDelete => 'Delete and restore employee records.',
             self::OrganisationView => 'View departments, positions, grades and locations.',
             self::OrganisationManage => 'Manage departments, positions, grades and locations.',
             self::LeaveView => 'View leave requests, balances and calendars.',

@@ -11,7 +11,13 @@ function openApiDocument(): string
 }
 
 it('serves Swagger UI and the OpenAPI document', function (): void {
-    $this->get(route('docs.ui'))->assertOk()->assertSee('swagger-ui', escape: false);
+    $assets = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@'.config('api.docs.swagger_ui_version');
+
+    $this->get(route('docs.ui'))
+        ->assertOk()
+        ->assertSee($assets.'/swagger-ui-bundle.js', escape: false)
+        ->assertSee($assets.'/swagger-ui.css', escape: false)
+        ->assertDontSee('{{', escape: false);
 
     $this->get(route('docs.spec'))
         ->assertOk()

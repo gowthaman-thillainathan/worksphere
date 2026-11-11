@@ -17,6 +17,9 @@ enum CommonErrorCode: string
     case NotFound = 'not_found';
     case MethodNotAllowed = 'method_not_allowed';
     case Conflict = 'conflict';
+    case PreconditionFailed = 'precondition_failed';
+    case PreconditionRequired = 'precondition_required';
+    case PayloadTooLarge = 'payload_too_large';
     case ValidationFailed = 'validation_failed';
     case RateLimited = 'rate_limited';
     case ServiceUnavailable = 'service_unavailable';
@@ -32,6 +35,9 @@ enum CommonErrorCode: string
             Response::HTTP_NOT_FOUND => self::NotFound,
             Response::HTTP_METHOD_NOT_ALLOWED => self::MethodNotAllowed,
             Response::HTTP_CONFLICT => self::Conflict,
+            Response::HTTP_PRECONDITION_FAILED => self::PreconditionFailed,
+            Response::HTTP_PRECONDITION_REQUIRED => self::PreconditionRequired,
+            Response::HTTP_REQUEST_ENTITY_TOO_LARGE => self::PayloadTooLarge,
             Response::HTTP_UNPROCESSABLE_ENTITY => self::ValidationFailed,
             Response::HTTP_TOO_MANY_REQUESTS => self::RateLimited,
             Response::HTTP_SERVICE_UNAVAILABLE => self::ServiceUnavailable,

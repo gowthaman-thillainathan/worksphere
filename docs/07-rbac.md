@@ -42,7 +42,7 @@ erDiagram
 
 | Module | Permissions | Sensitive |
 |---|---|---|
-| Employee | `employee.view`, `employee.create`, `employee.update`, `employee.update.sensitive`, `employee.view.sensitive`, `employee.transfer`, `employee.terminate`, `employee.export` | `*.sensitive`, `export` |
+| Employee | `employee.view`, `employee.create`, `employee.update`, `employee.update.sensitive`, `employee.view.sensitive`, `employee.transfer`, `employee.terminate`, `employee.export`, `employee.delete` | `*.sensitive`, `export` |
 | Organisation | `organisation.view`, `organisation.manage` | |
 | Leave | `leave.view`, `leave.request.on_behalf`, `leave.approve`, `leave.adjust`, `leave.configure` | |
 | Attendance | `attendance.view`, `attendance.manage`, `attendance.configure` | |
@@ -62,7 +62,7 @@ erDiagram
 | `line_manager` | direct_reports (auto-assigned when someone reports to you) | `employee.view`, `leave.view`, `leave.approve`, `attendance.view` |
 | `department_head` | department | line manager + `employee.update`, `organisation.view` |
 | `hr_partner` | department / location | `employee.*` (not compensation), `leave.*`, `attendance.*`, `document.*` |
-| `hr_admin` | tenant | all employee, leave, attendance, organisation, document permissions + `employee.export` |
+| `hr_admin` | tenant | all employee (incl. `employee.delete`), leave, attendance, organisation, document permissions + `employee.export` |
 | `payroll_officer` | tenant / location | `employee.view`, `compensation.view`, `compensation.manage` |
 | `auditor` | tenant | read-only everything + `audit.view`; no sensitive fields |
 | `tenant_admin` | tenant | `access.manage`, `user.manage`, `tenant.manage`, `integration.manage`, `audit.view` |

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Meridian\Modules\Access\Application\Actions\SyncPermissions;
+use Meridian\Modules\Access\Contracts\RoleAssigner;
 use Meridian\Modules\Identity\Application\Actions\IssueTokenPair;
 use Meridian\Modules\Identity\Application\Data\ClientContext;
 use Meridian\Modules\Identity\Application\Data\TokenPair;
@@ -41,4 +43,24 @@ function issueTokensFor(User $user): TokenPair
 function refreshCookieName(): string
 {
     return (string) config('identity.refresh_token.cookie.name');
+}
+
+/**
+ * A verified user holding the given system role (or none), ready to call the API.
+ */
+function userWithRole(?string $role): User
+{
+    app(SyncPermissions::class)->handle();
+    $user = User::factory()->create();
+
+    if ($role !== null) {
+        app(RoleAssigner::class)->assign($user->id, $role);
+    }
+
+    return $user;
+}
+
+function tokenForRole(?string $role): string
+{
+    return issueTokensFor(userWithRole($role))->accessToken;
 }

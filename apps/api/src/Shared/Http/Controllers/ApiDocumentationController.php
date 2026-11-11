@@ -18,6 +18,12 @@ final readonly class ApiDocumentationController
 {
     private const SPEC_CONTENT_TYPE = 'application/yaml';
 
+    /**
+     * Pinned Swagger UI build on jsDelivr. Built here rather than in the view:
+     * in Blade, "@{{" is an escape for a literal "{{".
+     */
+    private const SWAGGER_UI_ASSETS = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@%s';
+
     public function __construct(
         private Config $config,
         private ViewFactory $views,
@@ -27,7 +33,7 @@ final readonly class ApiDocumentationController
     {
         return $this->views->make('api-docs', [
             'specUrl' => route('docs.spec'),
-            'swaggerUiVersion' => $this->config->get('api.docs.swagger_ui_version'),
+            'assetBaseUrl' => sprintf(self::SWAGGER_UI_ASSETS, $this->config->get('api.docs.swagger_ui_version')),
         ]);
     }
 
