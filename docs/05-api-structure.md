@@ -153,12 +153,14 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 | Method | Path | Permission |
 |---|---|---|
 | GET | `/employees/headcount` ✅ | `employee.view` — total and per status (dashboard) |
-| GET | `/employees` ✅ | `employee.view` — `q`, `filter[status\|employment_type\|manager_id\|hire_date][gte\|lte]\|trashed]`, `sort`, cursor pagination |
-| POST | `/employees` ✅ | `employee.create` (+ `employee.update.sensitive` for PII fields) |
+| GET | `/employees` ✅ | `employee.view` — `q`; text filters `filter[name\|employee_number\|email\|job_title]`; `filter[status\|employment_type\|manager_id\|department_id\|trashed]`, `filter[hire_date][gte\|lte]`; `sort` (incl. `department`, ADR-0008); cursor pagination |
+| POST | `/employees` ✅ | `employee.create` (+ `employee.update.sensitive` for PII fields; + `user.manage` and `access.manage` with `account: {role}`, ADR-0007) |
 | GET | `/employees/{id}` ✅ | `employee.view` (PII only with `employee.view.sensitive`) |
 | PATCH | `/employees/{id}` ✅ | `employee.update` (+ `employee.update.sensitive` for PII fields), `If-Match` required |
-| DELETE | `/employees/{id}` ✅ | `employee.delete` — soft delete, `If-Match` required; refused while the employee has direct reports |
-| POST | `/employees/{id}/restore` ✅ | `employee.delete` |
+| DELETE | `/employees/{id}` ✅ | `employee.delete` — soft delete with a required `reason` (body), `If-Match` required; refused while the employee has direct reports |
+| POST | `/employees/{id}/restore` ✅ | `employee.delete` — clears the deletion reason |
+| GET / POST | `/employees/{id}/account` ✅ | `employee.view` + `user.manage` (+ `access.manage` to create) — the employee's sign-in account; creating it sends an invitation |
+| PUT | `/employees/{id}/account/role` ✅ | `employee.view` + `user.manage` + `access.manage` — replace the account's role |
 | GET / POST / DELETE | `/employees/{id}/photo` ✅ | `employee.view` / `employee.update` — multipart upload, private storage, streamed through the API |
 | POST | `/employees/{id}/transfer` | `employee.transfer` — creates new employment record |
 | POST | `/employees/{id}/terminate` | `employee.terminate` |
@@ -166,9 +168,11 @@ Every filterable, sortable and includable field is **whitelisted** per endpoint 
 | GET | `/employees/{id}/employment-history` | `employee.view` |
 | GET | `/employees/{id}/direct-reports` | `employee.view` |
 | CRUD | `/employees/{id}/emergency-contacts` | `employee.update` or self |
-| GET | `/employees/{id}/documents` | `document.view` |
-| POST | `/employees/{id}/documents/upload-url` | `document.upload` — returns presigned S3 POST |
-| GET | `/documents/{id}/download-url` | `document.view` — short-lived presigned GET (60 s) |
+| GET | `/employees/{id}/documents` ✅ | `document.view` — confidential (ID proof) documents only with `document.view.confidential` |
+| POST | `/employees/{id}/documents` ✅ | `document.upload` — multipart, content-sniffed, ≤ 10 MB, SHA-256 checksum stored |
+| GET | `/documents/{id}/download` ✅ | `document.view` — streamed through the API as an attachment |
+| DELETE | `/documents/{id}` ✅ | `document.delete` — soft delete |
+| POST | `/employees/{id}/documents/upload-url` | `document.upload` — *planned for S3*: presigned POST instead of uploading through the API |
 | GET | `/org-chart?root={id}&depth=3` | `employee.view` |
 
 ### Compensation

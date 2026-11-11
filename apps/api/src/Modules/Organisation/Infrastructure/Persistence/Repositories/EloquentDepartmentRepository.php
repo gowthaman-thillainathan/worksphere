@@ -61,4 +61,10 @@ final class EloquentDepartmentRepository implements DepartmentDirectory, Departm
     {
         return Department::query()->whereKey($departmentId)->exists();
     }
+
+    public function nameOf(string $departmentId): ?string
+    {
+        /** @var string|null */
+        return Department::query()->whereKey($departmentId)->value('name');
+    }
 }

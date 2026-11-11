@@ -37,7 +37,9 @@ tags:
   - name: Access control
     description: Roles and permissions (RBAC).
   - name: Employees
-    description: Employee profiles, directory search and profile photos.
+    description: Employee profiles, directory search, profile photos and sign-in accounts.
+  - name: Documents
+    description: Files attached to employees (contracts, ID proofs, certificates).
   - name: Departments
     description: Organisational units (a tree).
   - name: Audit
@@ -323,6 +325,30 @@ paths:
           schema:
             type: string
             maxLength: 100
+        - name: filter[name]
+          in: query
+          description: Case-insensitive substring of the first, last or preferred name.
+          schema:
+            type: string
+            maxLength: 100
+        - name: filter[employee_number]
+          in: query
+          description: Case-insensitive substring of the employee number.
+          schema:
+            type: string
+            maxLength: 100
+        - name: filter[email]
+          in: query
+          description: Case-insensitive substring of the work e-mail address.
+          schema:
+            type: string
+            maxLength: 100
+        - name: filter[job_title]
+          in: query
+          description: Case-insensitive substring of the job title (designation).
+          schema:
+            type: string
+            maxLength: 100
         - name: filter[status]
           in: query
           description: Comma-separated statuses.
@@ -363,7 +389,10 @@ paths:
             enum: [with, only]
         - name: sort
           in: query
-          description: 'Comma-separated fields; prefix with `-` for descending. Default: `last_name,first_name`.'
+          description: |
+            Comma-separated fields from `employee_number`, `first_name`, `last_name`, `hire_date`,
+            `created_at` and `department` (department name; employees without one sort first);
+            prefix with `-` for descending. Default: `last_name,first_name`.
           schema:
             type: string
             example: -hire_date,last_name
@@ -400,6 +429,11 @@ paths:
         Requires `employee.create`; personal fields (`personal_email`, `phone`,
         `date_of_birth`) also require `employee.update.sensitive`. The employee number is
         generated. Audited as `employee.created`.
+
+        With `account`, a sign-in account with that role is created in the same transaction
+        (requires `user.manage` and `access.manage`) and the employee is e-mailed an invitation
+        to set a password. An unknown role is a 422 (`invalid_role`); an address that already
+        has an account is a 409 (`email_already_taken`).
       requestBody:
         required: true
         content:
@@ -521,9 +555,16 @@ paths:
       summary: Soft-delete an employee
       description: |
         Requires `employee.delete` and `If-Match`. The record is hidden from the directory but
-        kept (restorable, history preserved). Employees with direct reports cannot be deleted.
+        kept (restorable, history preserved). The reason is stored with the record and in the
+        audit trail (`employee.deleted`). Employees with direct reports cannot be deleted.
       parameters:
         - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeDeletion'
       responses:
         '204':
           description: Deleted.
@@ -537,6 +578,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
 
@@ -547,7 +590,9 @@ paths:
       tags: [Employees]
       operationId: restoreEmployee
       summary: Restore a soft-deleted employee
-      description: Requires `employee.delete`. Idempotent. Fails with 409 if the work e-mail was reused meanwhile.
+      description: |
+        Requires `employee.delete`. Idempotent. Clears the deletion reason; audited as
+        `employee.restored`. Fails with 409 if the work e-mail was reused meanwhile.
       responses:
         '200':
           description: Restored.
@@ -641,6 +686,202 @@ paths:
       responses:
         '204':
           description: Removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /employees/{employee}/account:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    get:
+      tags: [Employees]
+      operationId: getEmployeeAccount
+      summary: The employee's sign-in account
+      description: Requires `employee.view` and `user.manage`. 404 (`employee_account_not_found`) when the employee has none.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeAccountEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Employees]
+      operationId: createEmployeeAccount
+      summary: Give the employee a sign-in account
+      description: |
+        Requires `employee.view`, `user.manage` and `access.manage`. The account uses the
+        employee's work e-mail address and the given role; the employee is e-mailed an
+        invitation to set a password. Audited on the employee as `employee.account_created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeRole'
+      responses:
+        '201':
+          description: Account created and invitation sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeAccountEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /employees/{employee}/account/role:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    put:
+      tags: [Employees]
+      operationId: changeEmployeeRole
+      summary: Change the role of the employee's account
+      description: |
+        Requires `employee.view`, `user.manage` and `access.manage`. Replaces the account's role.
+        Audited on the employee as `employee.role_changed`; unchanged roles are a no-op.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeRole'
+      responses:
+        '200':
+          description: Role changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeAccountEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /employees/{employee}/documents:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    get:
+      tags: [Documents]
+      operationId: listEmployeeDocuments
+      summary: The employee's documents, newest first
+      description: Requires `document.view`. Confidential documents (ID proofs) are only listed with `document.view.confidential`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Documents]
+      operationId: uploadEmployeeDocument
+      summary: Attach a document to the employee
+      description: |
+        Requires `document.upload`. PDF, Word or image files (type detected from content), at
+        most 10 MB. A SHA-256 checksum is stored. Audited on the employee as `document.uploaded`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, title, category]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                  maxLength: 150
+                category:
+                  $ref: '#/components/schemas/DocumentCategory'
+                expires_on:
+                  type: [string, 'null']
+                  format: date
+                  description: Must be in the future.
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /documents/{document}/download:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: downloadDocument
+      summary: Download a document
+      description: Requires `document.view` (and `document.view.confidential` for confidential documents, otherwise 404). Served as an attachment.
+      responses:
+        '200':
+          description: The file.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /documents/{document}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Delete a document
+      description: Requires `document.delete`. Soft delete; the file is kept. Audited on the employee as `document.deleted`.
+      responses:
+        '204':
+          description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -874,6 +1115,13 @@ components:
       schema:
         type: string
         format: uuid
+    DocumentId:
+      name: document
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     DepartmentId:
       name: department
       in: path
@@ -1047,7 +1295,7 @@ components:
 
     Employee:
       type: object
-      required: [id, type, employee_number, first_name, last_name, preferred_name, display_name, work_email, job_title, employment_type, status, hire_date, termination_date, manager, department_id, photo_url, created_at, updated_at, deleted_at, meta]
+      required: [id, type, employee_number, first_name, last_name, preferred_name, display_name, work_email, job_title, employment_type, status, hire_date, termination_date, manager, department_id, department_name, has_account, photo_url, created_at, updated_at, deleted_at, deletion_reason, meta]
       properties:
         id:
           type: string
@@ -1093,6 +1341,12 @@ components:
         department_id:
           type: [string, 'null']
           format: uuid
+        department_name:
+          type: [string, 'null']
+          description: Name of the department, kept in sync when it is renamed.
+        has_account:
+          type: boolean
+          description: Whether the employee has a sign-in account.
         photo_url:
           type: [string, 'null']
           format: uri
@@ -1115,6 +1369,9 @@ components:
         deleted_at:
           type: [string, 'null']
           format: date-time
+        deletion_reason:
+          type: [string, 'null']
+          description: Why the record was deleted; null unless deleted.
         meta:
           type: object
           required: [version, permissions]
@@ -1126,7 +1383,7 @@ components:
               description: Actions the current user may take on this record.
               items:
                 type: string
-                enum: [update, delete, view_sensitive, update_sensitive]
+                enum: [update, delete, view_sensitive, update_sensitive, manage_account]
 
     EmployeeStatus:
       type: string
@@ -1189,6 +1446,117 @@ components:
         - $ref: '#/components/schemas/EmployeeUpdate'
         - type: object
           required: [first_name, last_name, work_email, job_title, employment_type, hire_date]
+          properties:
+            account:
+              $ref: '#/components/schemas/EmployeeRole'
+
+    EmployeeDeletion:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: Duplicate record created during onboarding.
+
+    EmployeeRole:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          maxLength: 50
+          description: Role key from `GET /roles`.
+          example: auditor
+
+    EmployeeAccountEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/EmployeeAccount'
+
+    EmployeeAccount:
+      type: object
+      required: [user_id, type, email, status, email_verified, role, last_login_at, created_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [employee_account]
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          example: active
+        email_verified:
+          type: boolean
+          description: False until the invitation is accepted.
+        role:
+          type: [string, 'null']
+          description: Role key.
+        last_login_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    DocumentCategory:
+      type: string
+      enum: [contract, id_proof, certificate, other]
+      description: '`id_proof` documents are confidential.'
+
+    DocumentEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Document'
+
+    Document:
+      type: object
+      required: [id, type, employee_id, title, category, confidential, file_name, mime_type, size_bytes, expires_on, download_url, uploaded_by, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [document]
+        employee_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          $ref: '#/components/schemas/DocumentCategory'
+        confidential:
+          type: boolean
+        file_name:
+          type: string
+          example: contract.pdf
+        mime_type:
+          type: string
+          example: application/pdf
+        size_bytes:
+          type: integer
+        expires_on:
+          type: [string, 'null']
+          format: date
+        download_url:
+          type: string
+          format: uri
+        uploaded_by:
+          type: [string, 'null']
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
 
     Headcount:
       type: object
@@ -1322,7 +1690,7 @@ components:
           format: date-time
         actor:
           type: object
-          required: [type, id]
+          required: [type, id, name]
           properties:
             type:
               type: string
@@ -1330,6 +1698,9 @@ components:
             id:
               type: [string, 'null']
               format: uuid
+            name:
+              type: [string, 'null']
+              description: The user's current name; null for system events or removed accounts.
         action:
           type: string
           example: employee.updated
@@ -1438,7 +1809,7 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Conflict:
-      description: Business conflict, e.g. `work_email_in_use`, `employee_has_direct_reports`, `department_code_in_use`, `department_in_use`.
+      description: Business conflict, e.g. `work_email_in_use`, `employee_has_direct_reports`, `employee_account_exists`, `email_already_taken`, `department_code_in_use`, `department_in_use`.
       content:
         application/problem+json:
           schema:

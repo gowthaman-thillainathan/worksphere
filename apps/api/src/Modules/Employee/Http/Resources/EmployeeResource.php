@@ -7,6 +7,7 @@ namespace Meridian\Modules\Employee\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Meridian\Modules\Access\Contracts\Permission;
+use Meridian\Modules\Employee\Http\Requests\AuthorizesAccountManagement;
 use Meridian\Modules\Employee\Infrastructure\Persistence\Models\Employee;
 
 /**
@@ -19,6 +20,8 @@ use Meridian\Modules\Employee\Infrastructure\Persistence\Models\Employee;
 final class EmployeeResource extends JsonResource
 {
     private const DATE_FORMAT = 'Y-m-d';
+
+    private const MANAGE_ACCOUNT = 'manage_account';
 
     /**
      * @var array<string, Permission>
@@ -54,6 +57,8 @@ final class EmployeeResource extends JsonResource
                 'display_name' => $this->manager->displayName(),
             ]),
             'department_id' => $this->department_id,
+            'department_name' => $this->department_id === null ? null : $this->department_name,
+            'has_account' => $this->user_id !== null,
             'photo_url' => $this->hasPhoto() && ! $this->trashed() ? route('employees.photo.show', $this->id) : null,
             $this->mergeWhen($this->canSee($request), fn (): array => [
                 'personal_email' => $this->personal_email,
@@ -63,6 +68,7 @@ final class EmployeeResource extends JsonResource
             'created_at' => $this->created_at->toIso8601ZuluString(),
             'updated_at' => $this->updated_at->toIso8601ZuluString(),
             'deleted_at' => $this->deleted_at?->toIso8601ZuluString(),
+            'deletion_reason' => $this->deletion_reason,
             'meta' => [
                 'version' => $this->version,
                 'permissions' => $this->allowedActions($request),
@@ -82,9 +88,15 @@ final class EmployeeResource extends JsonResource
     {
         $user = $request->user();
 
-        return array_keys(array_filter(
+        $actions = array_keys(array_filter(
             self::RECORD_ACTIONS,
             static fn (Permission $permission): bool => (bool) $user?->can($permission->value),
         ));
+
+        if (AuthorizesAccountManagement::allows($request)) {
+            $actions[] = self::MANAGE_ACCOUNT;
+        }
+
+        return $actions;
     }
 }

@@ -13,4 +13,7 @@ enum EmployeeErrorCode: string
     case HasDirectReports = 'employee_has_direct_reports';
     case PhotoNotFound = 'employee_photo_not_found';
     case InvalidEmploymentDates = 'invalid_employment_dates';
+    case InvalidRole = 'invalid_role';
+    case AccountAlreadyExists = 'employee_account_exists';
+    case AccountNotFound = 'employee_account_not_found';
 }

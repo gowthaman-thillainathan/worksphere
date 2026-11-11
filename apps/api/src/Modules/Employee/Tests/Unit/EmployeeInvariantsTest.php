@@ -71,16 +71,26 @@ final class ReportingLineRepository implements EmployeeRepository
     {
         return 1;
     }
+
+    public function renameDepartment(string $departmentId, string $name): int
+    {
+        return 0;
+    }
 }
 
 final readonly class KnownDepartments implements DepartmentLookup
 {
-    /** @param list<string> $ids */
-    public function __construct(private array $ids) {}
+    /** @param array<string, string> $names id => name */
+    public function __construct(private array $names) {}
 
     public function exists(string $departmentId): bool
     {
-        return in_array($departmentId, $this->ids, true);
+        return array_key_exists($departmentId, $this->names);
+    }
+
+    public function nameOf(string $departmentId): ?string
+    {
+        return $this->names[$departmentId] ?? null;
     }
 }
 
@@ -89,7 +99,7 @@ function invariants(array $emails = []): EmployeeInvariants
 {
     return new EmployeeInvariants(
         new ReportingLineRepository(['ceo' => null, 'vp' => 'ceo', 'lead' => 'vp', 'engineer' => 'lead'], $emails),
-        new KnownDepartments(['engineering']),
+        new KnownDepartments(['engineering' => 'Engineering']),
     );
 }
 
@@ -115,13 +125,13 @@ it('rejects a work e-mail that is already used', function (): void {
     invariants(['taken@meridian.test'])->assertWorkEmailAvailable('taken@meridian.test');
 })->throws(WorkEmailInUse::class);
 
-it('accepts known departments and no department', function (): void {
-    invariants()->assertValidDepartment('engineering');
-    invariants()->assertValidDepartment(null);
-})->throwsNoExceptions();
+it('resolves the name stored for sorting, empty without a department', function (): void {
+    expect(invariants()->departmentNameFor('engineering'))->toBe('Engineering')
+        ->and(invariants()->departmentNameFor(null))->toBe('');
+});
 
 it('rejects an unknown department', function (): void {
-    invariants()->assertValidDepartment('marketing');
+    invariants()->departmentNameFor('marketing');
 })->throws(InvalidDepartment::class);
 
 it('requires a termination date for terminated employees', function (): void {

@@ -6,8 +6,10 @@ export type {
   AuditEvent,
   Department,
   DepartmentCreate,
+  Document,
   DepartmentUpdate,
   Employee,
+  EmployeeAccount,
   EmployeeCreate,
   EmployeeUpdate,
   Headcount,
@@ -17,4 +19,4 @@ export type {
   Role,
   User,
 } from '@/services/api/generated/model';
-export { EmployeeStatus, EmploymentType } from '@/services/api/generated/model';
+export { DocumentCategory, EmployeeStatus, EmploymentType } from '@/services/api/generated/model';

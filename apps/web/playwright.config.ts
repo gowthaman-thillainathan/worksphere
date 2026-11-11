@@ -10,6 +10,10 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
 
+/** `npm run docs:screenshots` regenerates the README screenshots (docs/screenshots); never part of a test run. */
+const DOCS_TESTS = '**/docs/**';
+const capturingScreenshots = Boolean(process.env.DOCS_SCREENSHOTS);
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false, // tests share one database
@@ -21,10 +25,12 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
-  ],
+  projects: capturingScreenshots
+    ? [{ name: 'docs', testMatch: DOCS_TESTS, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, colorScheme: 'light' } }]
+    : [
+        { name: 'desktop', testIgnore: DOCS_TESTS, use: { ...devices['Desktop Chrome'] } },
+        { name: 'mobile', testIgnore: DOCS_TESTS, use: { ...devices['Pixel 7'] } },
+      ],
   webServer: process.env.CI
     ? [
         { command: 'php ../api/artisan serve --host=127.0.0.1 --port=8000', url: 'http://127.0.0.1:8000/health/live', reuseExistingServer: false },

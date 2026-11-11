@@ -11,3 +11,9 @@ npm run build
 ```
 
 Never edit `src/services/api/generated` by hand; CI regenerates it and fails on any difference.
+
+The employee module (directory, wizard, conflicts, documents, accounts, history) is described in [docs/12 — Employee Module](../../docs/12-employee-module.md). To regenerate its screenshots against a running stack:
+
+```bash
+E2E_EMAIL=… E2E_PASSWORD=… npm run docs:screenshots   # writes docs/screenshots/*.png
+```

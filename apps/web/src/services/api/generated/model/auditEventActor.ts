@@ -22,8 +22,11 @@ Every error is an RFC 9457 `application/problem+json` document with a stable
  */
 import type { AuditEventActorType } from './auditEventActorType';
 import type { AuditEventActorId } from './auditEventActorId';
+import type { AuditEventActorName } from './auditEventActorName';
 
 export type AuditEventActor = {
   type: AuditEventActorType;
   id: AuditEventActorId;
+  /** The user's current name; null for system events or removed accounts. */
+  name: AuditEventActorName;
 };

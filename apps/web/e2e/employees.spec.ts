@@ -1,52 +1,80 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { signIn, uniqueSuffix } from './support';
 
-test('creates, finds, edits, deletes and restores an employee', async ({ page }) => {
+async function createEmployee(page: Page, firstName: string, lastName: string, email: string): Promise<void> {
+  await page.getByLabel('First name').fill(firstName);
+  await page.getByLabel('Last name').fill(lastName);
+  await page.getByLabel('Work e-mail').fill(email);
+  await page.getByRole('button', { name: 'Next' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Employment' })).toBeVisible();
+  await page.getByLabel('Designation').fill('Engineer');
+  await page.getByRole('button', { name: 'Next' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Review' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Personal information' })).toContainText(email);
+  await page.getByRole('button', { name: 'Create employee' }).click();
+}
+
+test('creates, edits, finds, deletes and restores an employee', async ({ page }) => {
   const suffix = uniqueSuffix();
   const lastName = `Perera${suffix}`;
+  const name = `Nimal ${lastName}`;
 
   await signIn(page, '/employees/new');
+  await createEmployee(page, 'Nimal', lastName, `nimal.${suffix}@meridian.test`);
 
-  await page.getByLabel('First name').fill('Nimal');
-  await page.getByLabel('Last name').fill(lastName);
-  await page.getByLabel('Work e-mail').fill(`nimal.${suffix}@meridian.test`);
-  await page.getByLabel('Job title').fill('Engineer');
-  await page.getByRole('button', { name: 'Create employee' }).click();
-
-  await expect(page.getByRole('heading', { level: 1, name: `Nimal ${lastName}` })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   await expect(page.getByText(/EMP-\d{6}/).first()).toBeVisible();
 
   // Edit
   await page.getByRole('link', { name: 'Edit' }).click();
-  await page.getByLabel('Job title').fill('Lead Engineer');
+  await page.getByLabel('Designation').fill('Lead Engineer');
   await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Lead Engineer · EMP-', { exact: false })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  await expect(page.getByText('Lead Engineer').first()).toBeVisible();
 
-  // Find it in the directory
+  // The change is in the audit history
+  await page.getByRole('tab', { name: 'Audit history' }).click();
+  await expect(page.getByRole('tabpanel').getByText('Profile updated')).toBeVisible();
+  await expect(page.getByRole('tabpanel').getByText('Employee created')).toBeVisible();
+
+  // Find it in the directory (table on desktop, cards on phones)
   await page.goto('/employees');
   await page.getByRole('searchbox', { name: 'Search employees' }).fill(lastName);
-  const row = page.getByRole('row', { name: new RegExp(lastName) });
-  await expect(row).toBeVisible();
+  await expect(page.getByRole('link', { name })).toBeVisible();
 
-  // Soft delete, then restore from the deleted view
-  await row.getByRole('button', { name: /actions for/i }).click();
+  // Soft delete with a reason
+  await page.getByRole('button', { name: `Actions for ${name}` }).click();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete employee' }).click();
-  await expect(page.getByRole('dialog')).toBeHidden();
-  await expect(row).toBeHidden();
+  const deleteDialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+  await deleteDialog.getByLabel('Reason').fill('Created by the end-to-end test');
+  await deleteDialog.getByRole('button', { name: 'Delete employee' }).click();
+  await expect(deleteDialog).toBeHidden();
+  await expect(page.getByRole('link', { name })).toBeHidden();
 
-  // The filter lives in the URL; React Router applies it in a transition, so assert rather than check().
-  const deletedOnly = page.getByRole('checkbox', { name: 'Deleted only' });
-  await deletedOnly.click();
-  await expect(deletedOnly).toBeChecked();
-  await page.getByRole('row', { name: new RegExp(lastName) }).getByRole('button', { name: 'Restore' }).click();
-  await expect(page.getByText(`Nimal ${lastName} was restored.`)).toBeVisible();
+  // Show deleted records through the filter panel, then restore
+  await page.getByRole('button', { name: /filters/i }).click();
+  await page.getByRole('radio', { name: 'Deleted records' }).check();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByRole('list', { name: 'Applied filters' })).toContainText('Deleted records');
+
+  await page.getByRole('button', { name: `Actions for ${name}` }).click();
+  await page.getByRole('menuitem', { name: 'Restore' }).click();
+  const restoreDialog = page.getByRole('dialog', { name: `Restore ${name}?` });
+  await expect(restoreDialog).toContainText('Created by the end-to-end test');
+  await restoreDialog.getByRole('button', { name: 'Restore employee' }).click();
+  await expect(page.getByText(`${name} was restored.`)).toBeVisible();
 });
 
-test('shows validation errors next to the fields', async ({ page }) => {
+test('validates each wizard step before moving on', async ({ page }) => {
   await signIn(page, '/employees/new');
 
-  await page.getByRole('button', { name: 'Create employee' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByText('Enter a first name.')).toBeVisible();
   await expect(page.getByLabel('First name')).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Personal information' })).toBeVisible();
 });

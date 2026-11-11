@@ -12,10 +12,17 @@ const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['minute', 60],
 ];
 
-/** "2022-04-01" → "1 Apr 2022" in the user's locale. Date-only values are not shifted by time zone. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * "2022-04-01" → "1 Apr 2022" in the user's locale. Date-only values are not
+ * shifted by time zone; timestamps show the user's local calendar day.
+ */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
-  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!DATE_ONLY.test(value)) return dateFormatter.format(new Date(value));
+
+  const [year, month, day] = value.split('-').map(Number);
 
   return dateFormatter.format(new Date(year ?? 0, (month ?? 1) - 1, day ?? 1));
 }

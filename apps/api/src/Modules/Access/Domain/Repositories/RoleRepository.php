@@ -28,6 +28,11 @@ interface RoleRepository
     public function assign(string $userId, Role $role, ?string $grantedBy): void;
 
     /**
+     * Removes every assignment of the user other than the given role.
+     */
+    public function revokeAllExcept(string $userId, Role $keep): void;
+
+    /**
      * @return list<string> Keys of roles actively assigned to the user.
      */
     public function keysAssignedTo(string $userId): array;

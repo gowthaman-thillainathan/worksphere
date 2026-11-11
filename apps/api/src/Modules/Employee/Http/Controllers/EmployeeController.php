@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Meridian\Modules\Employee\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Meridian\Modules\Employee\Application\Actions\CreateEmployee;
@@ -14,6 +13,7 @@ use Meridian\Modules\Employee\Application\Actions\RestoreEmployee;
 use Meridian\Modules\Employee\Application\Actions\UpdateEmployee;
 use Meridian\Modules\Employee\Application\Queries\GetEmployee;
 use Meridian\Modules\Employee\Application\Queries\ListEmployees;
+use Meridian\Modules\Employee\Http\Requests\DeleteEmployeeRequest;
 use Meridian\Modules\Employee\Http\Requests\ListEmployeesRequest;
 use Meridian\Modules\Employee\Http\Requests\StoreEmployeeRequest;
 use Meridian\Modules\Employee\Http\Requests\UpdateEmployeeRequest;
@@ -40,7 +40,7 @@ final readonly class EmployeeController
      */
     public function store(StoreEmployeeRequest $request, CreateEmployee $createEmployee): JsonResponse
     {
-        $employee = $createEmployee->handle($request->toData());
+        $employee = $createEmployee->handle($request->toData(), $request->actorId());
 
         return $this->respond($employee, HttpStatus::HTTP_CREATED)
             ->header(self::LOCATION_HEADER, route('employees.show', $employee->id));
@@ -63,11 +63,11 @@ final readonly class EmployeeController
     }
 
     /**
-     * DELETE /employees/{employee} — soft delete, requires If-Match.
+     * DELETE /employees/{employee} — soft delete with a reason, requires If-Match.
      */
-    public function destroy(Request $request, string $employee, DeleteEmployee $deleteEmployee): Response
+    public function destroy(DeleteEmployeeRequest $request, string $employee, DeleteEmployee $deleteEmployee): Response
     {
-        $deleteEmployee->handle($employee, EntityTag::requiredVersion($request));
+        $deleteEmployee->handle($employee, $request->expectedVersion(), $request->reason());
 
         return response()->noContent();
     }

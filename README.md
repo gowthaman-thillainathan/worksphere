@@ -47,6 +47,7 @@ This repository is a reference implementation. It shows how a production system 
 | 09 | [Logging & Observability](docs/09-logging-observability.md) | Structured logs, correlation, tracing, metrics, audit trail |
 | 10 | [Testing Strategy](docs/10-testing-strategy.md) | Test pyramid, tooling, quality gates, test data |
 | 11 | [Frontend Architecture](docs/11-frontend-architecture.md) | React app structure, API layer, auth flow, state management, components |
+| 12 | [Employee Module](docs/12-employee-module.md) | Directory, wizard, conflicts, documents, accounts and audit history, from API to UI, with screenshots |
 | — | [Architecture Decision Records](docs/adr/README.md) | Key decisions and their trade-offs |
 
 ## Getting Started (API)
@@ -93,6 +94,7 @@ npm run dev        # http://localhost:5173 — proxies /api to the Laravel API
 | `npm test` | Vitest + Testing Library + MSW |
 | `npm run test:e2e` | Playwright against the running API and app (see [docs/11 §9](docs/11-frontend-architecture.md#9-local-development)) |
 | `npm run build` | Production build with per-page code splitting |
+| `npm run docs:screenshots` | Regenerate `docs/screenshots` from the running app |
 
 ## Frontend at a Glance
 
@@ -101,14 +103,24 @@ npm run dev        # http://localhost:5173 — proxies /api to the Laravel API
 - **Permissions:** navigation, pages, widgets and actions follow the permissions in `/me`. No role names are hard-coded.
 - **Screens:**
   - dashboard with headcount, departments, recent employees, quick actions and recent activity;
-  - employee directory with search, filters, sorting, cursor paging and URL-synced state;
-  - employee details, create and edit (server errors on fields, optimistic locking), photo upload, soft delete and restore (optimistic), audit history;
+  - employee directory: global search, advanced filters, department/join-date sorting, cursor paging, column selector (remembered), row selection with bulk delete, restore and CSV export, cards on phones;
+  - employee profile with tabs (overview, documents, audit history), sign-in access and recent activity;
+  - four-step create wizard, edit with a conflict dialog for concurrent changes, photo upload with drag and drop, crop and progress, soft delete with a required reason, restore;
   - departments, roles and settings (theme, sign out everywhere).
 - **Quality:**
   - lazy-loaded pages with Suspense, skeletons, empty and error states;
   - keyboard and screen-reader support;
   - mobile, tablet and desktop layouts; light, dark and system themes;
   - tests at three levels: unit, integration (MSW) and E2E (Playwright, desktop + mobile).
+
+### Employee module
+
+| Directory | Profile |
+|---|---|
+| ![Employee directory](docs/screenshots/employee-directory.png) | ![Employee profile](docs/screenshots/employee-profile.png) |
+| ![Create wizard](docs/screenshots/employee-create-wizard.png) | ![Edit conflict dialog](docs/screenshots/employee-edit-conflict.png) |
+
+More screenshots and the module's architecture: [docs/12 — Employee Module](docs/12-employee-module.md).
 
 ## Authentication at a Glance
 
@@ -126,9 +138,11 @@ npm run dev        # http://localhost:5173 — proxies /api to the Laravel API
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/v1/employees` | Directory with free-text search (`q`), whitelisted filters (`filter[status]=active,on_leave`, `filter[hire_date][gte]=…`, `filter[trashed]=only`), multi-field `sort=-hire_date,last_name` and cursor pagination |
+| `GET /api/v1/employees` | Directory with free-text search (`q`), whitelisted filters (`filter[name\|employee_number\|email\|job_title]`, `filter[status]=active,on_leave`, `filter[hire_date][gte]=…`, `filter[trashed]=only`), multi-field `sort=-hire_date,department` and cursor pagination |
 | `POST` · `GET` · `PATCH` `/api/v1/employees[/{id}]` | Create, read and update with validation, generated employee numbers and **optimistic locking** (`ETag` / `If-Match`) |
-| `DELETE /api/v1/employees/{id}` · `POST …/restore` | Soft delete and restore, blocked while the employee still has direct reports |
+| `DELETE /api/v1/employees/{id}` · `POST …/restore` | Soft delete with a required reason, and restore; blocked while the employee still has direct reports |
+| `GET` · `POST /api/v1/employees/{id}/account` · `PUT …/account/role` | The employee's sign-in account: invitation by e-mail, one role ([ADR-0007](docs/adr/0007-employee-sign-in-accounts.md)) |
+| `GET` · `POST /api/v1/employees/{id}/documents` · `GET /documents/{id}/download` · `DELETE /documents/{id}` | Contracts, ID proofs (confidential) and certificates, privately stored |
 | `GET` · `POST` · `DELETE /api/v1/employees/{id}/photo` | Profile photo: content-sniffed image upload, private storage, streamed only to authorised users |
 | `GET /api/v1/audit-events` | Hash-chained, tamper-evident audit trail of every change, with personal data masked |
 | `GET` · `POST` · `PATCH` · `DELETE /api/v1/departments[/{id}]` | Department tree with unique codes, cycle protection and delete guards |
@@ -143,7 +157,7 @@ Errors follow RFC 9457 (`application/problem+json`) with stable `code`s and a `r
 | Phase | Scope |
 |---|---|
 | **1 — Foundation** | Monorepo, Docker dev environment, CI pipeline, Identity (✅ JWT auth, password reset, e-mail verification; MFA next), Tenancy, RBAC (✅ roles & permissions; scopes next), Audit (✅ hash-chained trail) |
-| **2 — Core HR** | Organisation (✅ departments; positions, locations next), Employee profiles (✅ CRUD, search, photos, soft delete), Documents, **Web app (✅ foundation, auth, dashboard, employees, departments, roles, settings)** |
+| **2 — Core HR** | Organisation (✅ departments; positions, locations next), Employee profiles (✅ CRUD, search, photos, soft delete with reason, sign-in accounts), Documents (✅ upload, confidentiality; S3 presigned URLs next), **Web app (✅ foundation, auth, dashboard, full employee module, departments, roles, settings)** |
 | **3 — Time** | Leave policies and requests with approval workflow, Attendance |
 | **4 — Compensation** | Salary history, bands, field-level protection |
 | **5 — Production** | Terraform for AWS, blue/green deploys, dashboards, load tests, runbooks |

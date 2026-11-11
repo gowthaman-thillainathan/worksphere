@@ -30,4 +30,5 @@ export const EmployeeMetaPermissionsItem = {
   delete: 'delete',
   view_sensitive: 'view_sensitive',
   update_sensitive: 'update_sensitive',
+  manage_account: 'manage_account',
 } as const;

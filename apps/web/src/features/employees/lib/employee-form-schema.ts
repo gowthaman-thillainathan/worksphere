@@ -55,6 +55,52 @@ export const employeeFormSchema = z
 
 export type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 
+/** Sign-in access chosen in the create wizard (needs user.manage and access.manage). */
+const accountSchema = z
+  .object({
+    grant_access: z.boolean(),
+    account_role: z.string(),
+  })
+  .superRefine((values, context) => {
+    if (values.grant_access && values.account_role === '') {
+      context.addIssue({ code: 'custom', path: ['account_role'], message: 'Choose a role.' });
+    }
+  });
+
+export const employeeWizardSchema = employeeFormSchema.and(accountSchema);
+
+export type EmployeeWizardValues = z.infer<typeof employeeWizardSchema>;
+
+/** The create wizard's steps and the fields each one owns, so a step validates only its fields. */
+export const WIZARD_STEPS = [
+  {
+    key: 'personal',
+    title: 'Personal information',
+    description: 'Name and contact details',
+    fields: ['first_name', 'last_name', 'preferred_name', 'work_email', 'phone', 'personal_email', 'date_of_birth'],
+  },
+  {
+    key: 'employment',
+    title: 'Employment',
+    description: 'Role in the organisation',
+    fields: ['job_title', 'department_id', 'manager', 'employment_type', 'hire_date'],
+  },
+  {
+    key: 'account',
+    title: 'Account',
+    description: 'Status and sign-in access',
+    fields: ['status', 'termination_date', 'grant_access', 'account_role'],
+  },
+  { key: 'review', title: 'Review', description: 'Check and create', fields: [] },
+] as const satisfies readonly { key: string; title: string; description: string; fields: readonly (keyof EmployeeWizardValues)[] }[];
+
+export type WizardField = (typeof WIZARD_STEPS)[number]['fields'][number];
+
+/** Index of the step that owns the field, e.g. to show a server error. */
+export function stepOfField(field: string): number {
+  return WIZARD_STEPS.findIndex((step) => (step.fields as readonly string[]).includes(field));
+}
+
 export const EMPLOYEE_FORM_FIELDS = [
   'first_name', 'last_name', 'preferred_name', 'work_email', 'job_title', 'employment_type', 'status',
   'hire_date', 'termination_date', 'department_id', 'personal_email', 'phone', 'date_of_birth',
@@ -71,6 +117,10 @@ export function emptyEmployeeForm(): EmployeeFormValues {
     hire_date: localIsoDate(new Date()), termination_date: '', manager: null, department_id: '',
     personal_email: '', phone: '', date_of_birth: '',
   };
+}
+
+export function emptyWizardForm(): EmployeeWizardValues {
+  return { ...emptyEmployeeForm(), grant_access: false, account_role: '' };
 }
 
 export function employeeToForm(employee: Employee): EmployeeFormValues {
@@ -111,6 +161,14 @@ export function formToPayload(values: EmployeeFormValues, includeSensitive: bool
       phone: blankToNull(values.phone),
       date_of_birth: blankToNull(values.date_of_birth),
     }),
+  };
+}
+
+/** Wizard values → API payload, with the sign-in account when it was requested. */
+export function wizardToPayload(values: EmployeeWizardValues, includeSensitive: boolean): EmployeeCreate {
+  return {
+    ...formToPayload(values, includeSensitive),
+    ...(values.grant_access && { account: { role: values.account_role } }),
   };
 }
 

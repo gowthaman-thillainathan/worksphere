@@ -38,6 +38,8 @@ final readonly class RestoreEmployee
 
             $this->invariants->assertWorkEmailAvailable($employee->work_email, $employee->id);
 
+            $reason = $employee->deletion_reason;
+            $employee->deletion_reason = null;
             $employee->version++;
             $this->employees->restore($employee);
 
@@ -45,6 +47,7 @@ final readonly class RestoreEmployee
                 action: EmployeeAuditAction::Restored->value,
                 subjectType: EmployeeAuditAction::SUBJECT_TYPE,
                 subjectId: $employee->id,
+                changes: $reason === null ? [] : [EmployeeAuditAction::DELETION_REASON_FIELD => [$reason, null]],
             ));
         });
 

@@ -17,6 +17,8 @@ export function describeError(error: unknown): ErrorDescription {
   switch (true) {
     case apiError.status === 0:
       return { title: 'You appear to be offline', description: 'Check your connection and try again.' };
+    case apiError.status === 400:
+      return { title: 'The request could not be processed', description: apiError.detail || 'Please check your input and try again.' };
     case apiError.status === 401:
       return { title: 'Your session has ended', description: 'Please sign in again.' };
     case apiError.is('email_not_verified'):

@@ -38,6 +38,9 @@ use Meridian\Modules\Employee\Domain\ValueObjects\EmploymentType;
  * @property CarbonImmutable|null $termination_date
  * @property string|null $manager_id
  * @property string|null $department_id
+ * @property string $department_name Copy of the department name, for sorting
+ * @property string|null $user_id Sign-in account, if any
+ * @property string|null $deletion_reason
  * @property string|null $photo_path
  * @property string|null $photo_mime_type
  * @property int $version
@@ -88,6 +91,7 @@ final class Employee extends Model
      */
     protected $attributes = [
         'version' => 1,
+        'department_name' => '',
     ];
 
     public function displayName(): string

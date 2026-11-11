@@ -1,11 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useId, useState, type ComponentProps, type KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { EmployeeService } from '@/services/employee-service';
-import { queryKeys } from '@/shared/lib/query-keys';
 import { cn } from '@/shared/lib/utils';
+import { useEmployees } from '../api/employee-queries';
 
 const RESULT_LIMIT = 8;
 
@@ -33,13 +31,8 @@ export function EmployeePicker({ value, onChange, excludeId, className, onBlur, 
   const search = useDebouncedValue(term, 250);
   const query = { search, perPage: RESULT_LIMIT };
 
-  const results = useQuery({
-    queryKey: queryKeys.employees.list(query),
-    queryFn: ({ signal }) => EmployeeService.list(query, signal),
-    enabled: open,
-    select: (page) => page.data.filter((employee) => employee.id !== excludeId),
-  });
-  const options = results.data ?? [];
+  const results = useEmployees(query, { enabled: open });
+  const options = results.data?.data.filter((employee) => employee.id !== excludeId) ?? [];
 
   const pick = (index: number) => {
     const employee = options[index];

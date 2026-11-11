@@ -10,6 +10,9 @@ use Meridian\Modules\Employee\Domain\ValueObjects\EmploymentType;
 
 final readonly class NewEmployeeData
 {
+    /**
+     * @param  string|null  $accountRole  When set, a sign-in account with this role is created too.
+     */
     public function __construct(
         public string $firstName,
         public string $lastName,
@@ -25,6 +28,7 @@ final readonly class NewEmployeeData
         public ?string $personalEmail = null,
         public ?string $phone = null,
         public ?string $dateOfBirth = null,
+        public ?string $accountRole = null,
     ) {}
 
     /**

@@ -1,24 +1,94 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { AuditService } from '@/services/audit-service';
+import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
+import { AuditService, type AuditQuery } from '@/services/audit-service';
+import { DocumentService } from '@/services/document-service';
 import { EmployeeService, type EmployeeListQuery } from '@/services/employee-service';
 import { queryKeys } from '@/shared/lib/query-keys';
-import type { Employee, EmployeeCreate, EmployeeUpdate, ListEmployees200 } from '@/types/api';
+import type { Employee, ListEmployees200 } from '@/types/api';
 
-const AUDIT_PAGE_SIZE = 20;
+/** Reads of the employee module. Writes live in employee-mutations.ts. */
 
-export function useEmployees(query: EmployeeListQuery) {
-  return useQuery({
+const HISTORY_PAGE_SIZE = 20;
+const RECENT_ACTIVITY_SIZE = 5;
+/** Prefetched details are fresh enough to show without a spinner for this long. */
+const PREFETCH_STALE_TIME = 30_000;
+const SUBJECT_TYPE = 'employee';
+
+interface ListOptions {
+  enabled?: boolean;
+  /** Fetch the next page in the background so "Next" feels instant. */
+  prefetchNext?: boolean;
+}
+
+function listQueryOptions(query: EmployeeListQuery) {
+  return {
     queryKey: queryKeys.employees.list(query),
-    queryFn: ({ signal }) => EmployeeService.list(query, signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) => EmployeeService.list(query, signal),
+  };
+}
+
+export function useEmployees(query: EmployeeListQuery, { enabled = true, prefetchNext = false }: ListOptions = {}) {
+  const queryClient = useQueryClient();
+  const result = useQuery({
+    ...listQueryOptions(query),
     placeholderData: keepPreviousData, // keep the table steady while the next page loads
+    enabled,
   });
+  const nextCursor = result.data?.meta.next_cursor;
+
+  useEffect(() => {
+    if (prefetchNext && nextCursor) {
+      void queryClient.prefetchQuery(listQueryOptions({ ...query, cursor: nextCursor }));
+    }
+  }, [prefetchNext, nextCursor, query, queryClient]);
+
+  return result;
+}
+
+/** An employee already shown in a cached directory page, to render the profile instantly. */
+function fromCachedLists(queryClient: QueryClient, id: string): Employee | undefined {
+  for (const [, page] of queryClient.getQueriesData<ListEmployees200>({ queryKey: queryKeys.employees.lists() })) {
+    const match = page?.data.find((employee) => employee.id === id && employee.deleted_at === null);
+
+    if (match) return match;
+  }
+
+  return undefined;
 }
 
 export function useEmployee(id: string) {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  return useQuery<Employee>({
     queryKey: queryKeys.employees.detail(id),
     queryFn: ({ signal }) => EmployeeService.get(id, signal),
+    placeholderData: () => fromCachedLists(queryClient, id),
   });
+}
+
+/** Loads a profile on hover or focus, before the click. */
+export function usePrefetchEmployee() {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    (id: string) =>
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.employees.detail(id),
+        queryFn: ({ signal }) => EmployeeService.get(id, signal),
+        staleTime: PREFETCH_STALE_TIME,
+      }),
+    [queryClient],
+  );
+}
+
+/** Fetches the current version from the API, bypassing the cache (e.g. after a 412). */
+export function useFetchLatestEmployee() {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    (id: string) => queryClient.fetchQuery({ queryKey: queryKeys.employees.detail(id), queryFn: ({ signal }) => EmployeeService.get(id, signal), staleTime: 0 }),
+    [queryClient],
+  );
 }
 
 export function useHeadcount(enabled = true) {
@@ -39,101 +109,39 @@ export function useEmployeePhoto(employee: Pick<Employee, 'id' | 'photo_url' | '
   });
 }
 
-export function useEmployeeAuditTrail(id: string, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.audit.list({ subjectType: 'employee', subjectId: id, perPage: AUDIT_PAGE_SIZE }),
-    queryFn: ({ signal }) => AuditService.list({ subjectType: 'employee', subjectId: id, perPage: AUDIT_PAGE_SIZE }, signal),
+/** The full history, newest first, loaded page by page. */
+export function useEmployeeHistory(id: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.audit.subject(SUBJECT_TYPE, id),
+    queryFn: ({ signal, pageParam }) => AuditService.list({ subjectType: SUBJECT_TYPE, subjectId: id, perPage: HISTORY_PAGE_SIZE, cursor: pageParam }, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.meta.next_cursor ?? undefined,
     enabled,
   });
 }
 
-function storeEmployee(queryClient: QueryClient, employee: Employee) {
-  queryClient.setQueryData(queryKeys.employees.detail(employee.id), employee);
-  void queryClient.invalidateQueries({ queryKey: queryKeys.employees.lists() });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.employees.headcount() });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.audit.all });
-}
+export function useRecentActivity(id: string, enabled: boolean) {
+  const query: AuditQuery = { subjectType: SUBJECT_TYPE, subjectId: id, perPage: RECENT_ACTIVITY_SIZE };
 
-export function useCreateEmployee() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (input: EmployeeCreate) => EmployeeService.create(input),
-    onSuccess: (employee) => storeEmployee(queryClient, employee),
+  return useQuery({
+    queryKey: queryKeys.audit.list(query),
+    queryFn: ({ signal }) => AuditService.list(query, signal),
+    enabled,
   });
 }
 
-export function useUpdateEmployee(id: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ version, changes }: { version: number; changes: EmployeeUpdate }) => EmployeeService.update(id, version, changes),
-    onSuccess: (employee) => storeEmployee(queryClient, employee),
+export function useEmployeeAccount(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.employees.account(id),
+    queryFn: ({ signal }) => EmployeeService.account(id, signal),
+    enabled,
   });
 }
 
-/**
- * Optimistically removes the employee from every cached list page, rolls
- * back if the API refuses (e.g. 409 direct reports, 412 stale version).
- */
-function useOptimisticListRemoval<Variables>(mutationFn: (variables: Variables) => Promise<unknown>, idOf: (variables: Variables) => string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn,
-    onMutate: async (variables) => {
-      const id = idOf(variables);
-      await queryClient.cancelQueries({ queryKey: queryKeys.employees.lists() });
-      const snapshot = queryClient.getQueriesData<ListEmployees200>({ queryKey: queryKeys.employees.lists() });
-
-      queryClient.setQueriesData<ListEmployees200>({ queryKey: queryKeys.employees.lists() }, (page) =>
-        page ? { ...page, data: page.data.filter((employee) => employee.id !== id) } : page,
-      );
-
-      return { snapshot };
-    },
-    onError: (_error, _variables, context) => {
-      context?.snapshot.forEach(([key, data]) => queryClient.setQueryData(key, data));
-    },
-    onSettled: (_data, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.audit.all });
-      queryClient.removeQueries({ queryKey: queryKeys.employees.detail(idOf(variables)), exact: true });
-    },
-  });
-}
-
-export function useDeleteEmployee() {
-  return useOptimisticListRemoval(
-    ({ id, version }: { id: string; version: number }) => EmployeeService.remove(id, version),
-    ({ id }) => id,
-  );
-}
-
-export function useRestoreEmployee() {
-  return useOptimisticListRemoval((id: string) => EmployeeService.restore(id), (id) => id);
-}
-
-export function useUploadEmployeePhoto(id: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (photo: File) => EmployeeService.uploadPhoto(id, photo),
-    onSuccess: (employee) => storeEmployee(queryClient, employee),
-  });
-}
-
-export function useRemoveEmployeePhoto(employee: Employee) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => EmployeeService.removePhoto(employee.id),
-    onSuccess: () => {
-      queryClient.setQueryData<Employee>(queryKeys.employees.detail(employee.id), (current) =>
-        current ? { ...current, photo_url: null, meta: { ...current.meta, version: current.meta.version + 1 } } : current,
-      );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.audit.all });
-    },
+export function useEmployeeDocuments(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.employees.documents(id),
+    queryFn: ({ signal }) => DocumentService.list(id, signal),
+    enabled,
   });
 }

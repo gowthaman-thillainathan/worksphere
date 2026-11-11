@@ -23,6 +23,6 @@ Every error is an RFC 9457 `application/problem+json` document with a stable
 import type { Problem } from './problem';
 
 /**
- * Business conflict, e.g. `work_email_in_use`, `employee_has_direct_reports`, `department_code_in_use`, `department_in_use`.
+ * Business conflict, e.g. `work_email_in_use`, `employee_has_direct_reports`, `employee_account_exists`, `email_already_taken`, `department_code_in_use`, `department_in_use`.
  */
 export type ConflictResponse = Problem;

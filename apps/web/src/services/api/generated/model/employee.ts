@@ -27,11 +27,13 @@ import type { EmployeeStatus } from './employeeStatus';
 import type { EmployeeTerminationDate } from './employeeTerminationDate';
 import type { EmployeeManager } from './employeeManager';
 import type { EmployeeDepartmentId } from './employeeDepartmentId';
+import type { EmployeeDepartmentName } from './employeeDepartmentName';
 import type { EmployeePhotoUrl } from './employeePhotoUrl';
 import type { EmployeePersonalEmail } from './employeePersonalEmail';
 import type { EmployeePhone } from './employeePhone';
 import type { EmployeeDateOfBirth } from './employeeDateOfBirth';
 import type { EmployeeDeletedAt } from './employeeDeletedAt';
+import type { EmployeeDeletionReason } from './employeeDeletionReason';
 import type { EmployeeMeta } from './employeeMeta';
 
 export interface Employee {
@@ -50,6 +52,10 @@ export interface Employee {
   termination_date: EmployeeTerminationDate;
   manager: EmployeeManager;
   department_id: EmployeeDepartmentId;
+  /** Name of the department, kept in sync when it is renamed. */
+  department_name: EmployeeDepartmentName;
+  /** Whether the employee has a sign-in account. */
+  has_account: boolean;
   photo_url: EmployeePhotoUrl;
   /** Only with `employee.view.sensitive`. */
   personal_email?: EmployeePersonalEmail;
@@ -60,5 +66,7 @@ export interface Employee {
   created_at: string;
   updated_at: string;
   deleted_at: EmployeeDeletedAt;
+  /** Why the record was deleted; null unless deleted. */
+  deletion_reason: EmployeeDeletionReason;
   meta: EmployeeMeta;
 }

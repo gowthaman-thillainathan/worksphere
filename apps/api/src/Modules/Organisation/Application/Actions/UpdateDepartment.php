@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Meridian\Modules\Organisation\Application\Actions;
 
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\ConnectionInterface;
 use Meridian\Modules\Audit\Contracts\AuditRecord;
 use Meridian\Modules\Audit\Contracts\AuditRecorder;
 use Meridian\Modules\Audit\Contracts\ChangeSet;
 use Meridian\Modules\Organisation\Application\Data\DepartmentChanges;
+use Meridian\Modules\Organisation\Contracts\Events\DepartmentRenamed;
 use Meridian\Modules\Organisation\Domain\Exceptions\DepartmentNotFound;
 use Meridian\Modules\Organisation\Domain\Repositories\DepartmentRepository;
 use Meridian\Modules\Organisation\Domain\Services\DepartmentInvariants;
@@ -17,15 +19,19 @@ use Meridian\Modules\Organisation\Infrastructure\Persistence\Models\Department;
 use Meridian\Shared\Domain\Exceptions\StaleVersion;
 
 /**
- * Partial update with optimistic locking (If-Match).
+ * Partial update with optimistic locking (If-Match). A rename is published
+ * as DepartmentRenamed in the same transaction.
  */
 final readonly class UpdateDepartment
 {
+    private const NAME_FIELD = 'name';
+
     public function __construct(
         private DepartmentRepository $departments,
         private DepartmentInvariants $invariants,
         private AuditRecorder $audit,
         private ConnectionInterface $database,
+        private Dispatcher $events,
     ) {}
 
     public function handle(string $departmentId, DepartmentChanges $changes, int $expectedVersion): Department
@@ -62,6 +68,10 @@ final readonly class UpdateDepartment
                 subjectId: $department->id,
                 changes: $diff,
             ));
+
+            if (array_key_exists(self::NAME_FIELD, $diff)) {
+                $this->events->dispatch(new DepartmentRenamed($department->id, $department->name));
+            }
         });
 
         return $this->departments->find($departmentId) ?? throw DepartmentNotFound::withId($departmentId);

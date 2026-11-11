@@ -20,7 +20,7 @@ export function FormField({ label, error, hint, required, className, children }:
   const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(' ') || undefined;
 
   return (
-    <div className={cn('grid gap-2', className)}>
+    <div className={cn('grid content-start gap-2', className)}>
       <Label htmlFor={id}>
         {label}
         {required && (

@@ -14,6 +14,8 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.employees.all, 'detail', id] as const,
     photo: (id: string, version: number) => [...queryKeys.employees.all, 'photo', id, version] as const,
     headcount: () => [...queryKeys.employees.all, 'headcount'] as const,
+    account: (id: string) => [...queryKeys.employees.all, 'account', id] as const,
+    documents: (id: string) => [...queryKeys.employees.all, 'documents', id] as const,
   },
   departments: {
     all: ['departments'] as const,
@@ -26,5 +28,6 @@ export const queryKeys = {
   audit: {
     all: ['audit'] as const,
     list: (query: AuditQuery) => [...queryKeys.audit.all, query] as const,
+    subject: (subjectType: string, subjectId: string) => [...queryKeys.audit.all, 'subject', subjectType, subjectId] as const,
   },
 };

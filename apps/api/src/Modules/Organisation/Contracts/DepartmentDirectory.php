@@ -10,4 +10,9 @@ namespace Meridian\Modules\Organisation\Contracts;
 interface DepartmentDirectory
 {
     public function exists(string $departmentId): bool;
+
+    /**
+     * The department's current name, or null when it does not exist.
+     */
+    public function nameOf(string $departmentId): ?string;
 }

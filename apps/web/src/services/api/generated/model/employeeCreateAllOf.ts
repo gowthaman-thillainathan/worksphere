@@ -20,5 +20,8 @@ Every error is an RFC 9457 `application/problem+json` document with a stable
 
  * OpenAPI spec version: 1.0.0
  */
+import type { EmployeeRole } from './employeeRole';
 
-export type EmployeeCreateAllOf = { [key: string]: unknown };
+export type EmployeeCreateAllOf = {
+  account?: EmployeeRole;
+};

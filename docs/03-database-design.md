@@ -113,7 +113,7 @@ GiST index on `path` → "all employees in Engineering and below" is one indexed
 
 ### 2.5 Employee
 
-> **Implemented (Phase 4):** `employees` with identity, contact and employment fields; `personal_email`, `phone` and `date_of_birth` encrypted; `manager_id`; profile photo (`photo_path`, `photo_mime_type`); `version`; soft deletes. Employee numbers come from a locked counter row in `employee_number_sequences`. **Not yet built:** `department_id`/`location_id` (Organisation module), `user_id`, `national_id`, `search_vector` and the partial unique index on `work_email`. Work-e-mail uniqueness among active employees is enforced by the application for now, because the project rules avoid raw SQL.
+> **Implemented (Phase 4):** `employees` with identity, contact and employment fields; `personal_email`, `phone` and `date_of_birth` encrypted; `manager_id`; profile photo (`photo_path`, `photo_mime_type`); `version`; soft deletes. Employee numbers come from a locked counter row in `employee_number_sequences`. **Added in Phase 5–6:** `department_id`; `department_name`, a copy of the department's name kept in sync for sorting ([ADR-0008](adr/0008-denormalised-department-name.md)); `user_id`, the optional sign-in account ([ADR-0007](adr/0007-employee-sign-in-accounts.md)); `deletion_reason`, required on soft delete and cleared on restore. **Not yet built:** `location_id`, `national_id`, `search_vector` and the partial unique index on `work_email`. Work-e-mail uniqueness among active employees is enforced by the application for now, because the project rules avoid raw SQL.
 
 **employees**
 
@@ -208,6 +208,8 @@ Current balance = `SUM(amount)`; a materialised `leave_balances` table (`employe
 ### 2.9 Documents
 
 **documents** — `id`, `tenant_id`, `employee_id`, `category` (`contract`, `id_proof`, `certificate`), `title`, `s3_key`, `mime_type`, `size_bytes`, `checksum_sha256`, `version int`, `expires_on date NULL`, `uploaded_by`, `deleted_at`.
+
+> **Implemented (Phase 6, Documents module):** `id`, `employee_id`, `category` (`contract`, `id_proof` — confidential, `certificate`, `other`), `title`, `file_name` (original name), `path` (private storage key), `mime_type`, `size_bytes`, `checksum_sha256`, `expires_on`, `uploaded_by` (no FK: the record outlives accounts), timestamps, `deleted_at`. Not yet: `tenant_id`, `version` (documents are immutable for now).
 
 Files are never stored in PostgreSQL. Uploads go directly to S3 via presigned URLs; the API registers metadata after an S3 event confirms the upload and a malware scan (GuardDuty Malware Protection for S3) passes.
 

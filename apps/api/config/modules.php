@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Meridian\Modules\Access\AccessServiceProvider;
 use Meridian\Modules\Audit\AuditServiceProvider;
+use Meridian\Modules\Documents\DocumentsServiceProvider;
 use Meridian\Modules\Employee\EmployeeServiceProvider;
 use Meridian\Modules\Identity\IdentityServiceProvider;
 use Meridian\Modules\Organisation\OrganisationServiceProvider;
@@ -26,6 +27,7 @@ return [
         AuditServiceProvider::class,
         OrganisationServiceProvider::class,
         EmployeeServiceProvider::class,
+        DocumentsServiceProvider::class,
     ],
 
 ];

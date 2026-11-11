@@ -20,10 +20,13 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Meridian\Modules\Audit\Contracts\ActorDirectory;
+use Meridian\Modules\Identity\Application\Actions\ProvisionAccount;
 use Meridian\Modules\Identity\Application\Data\LockoutPolicy;
 use Meridian\Modules\Identity\Application\Data\TokenPolicy;
 use Meridian\Modules\Identity\Application\Listeners\LogSecurityEvent;
 use Meridian\Modules\Identity\Application\Listeners\NotifyUserOfLockout;
+use Meridian\Modules\Identity\Contracts\AccountProvisioner;
 use Meridian\Modules\Identity\Domain\Events\SecurityEvent;
 use Meridian\Modules\Identity\Domain\Events\UserLockedOut;
 use Meridian\Modules\Identity\Domain\Repositories\RefreshTokenRepository;
@@ -34,6 +37,7 @@ use Meridian\Modules\Identity\Domain\ValueObjects\EmailVerificationHash;
 use Meridian\Modules\Identity\Http\Middleware\EnsureEmailIsVerified;
 use Meridian\Modules\Identity\Http\RateLimiterName;
 use Meridian\Modules\Identity\Http\RouteName;
+use Meridian\Modules\Identity\Infrastructure\Audit\UserActorDirectory;
 use Meridian\Modules\Identity\Infrastructure\Console\CreateUserCommand;
 use Meridian\Modules\Identity\Infrastructure\Persistence\Models\User;
 use Meridian\Modules\Identity\Infrastructure\Persistence\Repositories\EloquentRefreshTokenRepository;
@@ -56,6 +60,8 @@ final class IdentityServiceProvider extends ServiceProvider
         UserRepository::class => EloquentUserRepository::class,
         RefreshTokenRepository::class => EloquentRefreshTokenRepository::class,
         AccessTokenRevocationList::class => CacheAccessTokenRevocationList::class,
+        AccountProvisioner::class => ProvisionAccount::class,
+        ActorDirectory::class => UserActorDirectory::class,
     ];
 
     public function register(): void

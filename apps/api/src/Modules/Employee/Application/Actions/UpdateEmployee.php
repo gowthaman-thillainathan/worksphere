@@ -48,7 +48,7 @@ final readonly class UpdateEmployee
             }
 
             if ($changes->has('department_id')) {
-                $this->invariants->assertValidDepartment($changes->get('department_id'));
+                $employee->department_name = $this->invariants->departmentNameFor($changes->get('department_id'));
             }
 
             $before = $employee->auditSnapshot();

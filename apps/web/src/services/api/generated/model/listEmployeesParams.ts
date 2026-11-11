@@ -31,6 +31,26 @@ export type ListEmployeesParams = {
  */
 q?: string;
 /**
+ * Case-insensitive substring of the first, last or preferred name.
+ * @maxLength 100
+ */
+'filter[name]'?: string;
+/**
+ * Case-insensitive substring of the employee number.
+ * @maxLength 100
+ */
+'filter[employee_number]'?: string;
+/**
+ * Case-insensitive substring of the work e-mail address.
+ * @maxLength 100
+ */
+'filter[email]'?: string;
+/**
+ * Case-insensitive substring of the job title (designation).
+ * @maxLength 100
+ */
+'filter[job_title]'?: string;
+/**
  * Comma-separated statuses.
  */
 'filter[status]'?: string;
@@ -47,7 +67,10 @@ q?: string;
  */
 'filter[trashed]'?: ListEmployeesFilterTrashed;
 /**
- * Comma-separated fields; prefix with `-` for descending. Default: `last_name,first_name`.
+ * Comma-separated fields from `employee_number`, `first_name`, `last_name`, `hire_date`,
+`created_at` and `department` (department name; employees without one sort first);
+prefix with `-` for descending. Default: `last_name,first_name`.
+
  */
 sort?: string;
 /**

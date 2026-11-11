@@ -15,4 +15,9 @@ final readonly class OrganisationDepartmentLookup implements DepartmentLookup
     {
         return $this->directory->exists($departmentId);
     }
+
+    public function nameOf(string $departmentId): ?string
+    {
+        return $this->directory->nameOf($departmentId);
+    }
 }

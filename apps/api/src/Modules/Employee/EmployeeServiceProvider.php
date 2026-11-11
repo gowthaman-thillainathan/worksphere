@@ -5,22 +5,29 @@ declare(strict_types=1);
 namespace Meridian\Modules\Employee;
 
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Meridian\Modules\Employee\Application\Data\EmployeeNumberPolicy;
+use Meridian\Modules\Employee\Application\Listeners\SyncDepartmentName;
+use Meridian\Modules\Employee\Contracts\EmployeeDirectory;
 use Meridian\Modules\Employee\Domain\Repositories\EmployeeRepository;
 use Meridian\Modules\Employee\Domain\Services\DepartmentLookup;
+use Meridian\Modules\Employee\Domain\Services\EmployeeAccounts;
 use Meridian\Modules\Employee\Domain\Services\EmployeePhotoStorage;
+use Meridian\Modules\Employee\Infrastructure\Identity\IdentityEmployeeAccounts;
 use Meridian\Modules\Employee\Infrastructure\Organisation\EmployeeDepartmentReferenceChecker;
 use Meridian\Modules\Employee\Infrastructure\Organisation\OrganisationDepartmentLookup;
 use Meridian\Modules\Employee\Infrastructure\Persistence\Repositories\EloquentEmployeeRepository;
 use Meridian\Modules\Employee\Infrastructure\Storage\FilesystemEmployeePhotoStorage;
 use Meridian\Modules\Organisation\Contracts\DepartmentReferenceChecker;
+use Meridian\Modules\Organisation\Contracts\Events\DepartmentRenamed;
 
 /**
- * Employee module: profiles, directory search, headcount and profile photos.
+ * Employee module: profiles, directory search, headcount, profile photos
+ * and sign-in accounts for employees.
  */
 final class EmployeeServiceProvider extends ServiceProvider
 {
@@ -29,7 +36,9 @@ final class EmployeeServiceProvider extends ServiceProvider
      */
     public array $bindings = [
         EmployeeRepository::class => EloquentEmployeeRepository::class,
+        EmployeeDirectory::class => EloquentEmployeeRepository::class,
         DepartmentLookup::class => OrganisationDepartmentLookup::class,
+        EmployeeAccounts::class => IdentityEmployeeAccounts::class,
     ];
 
     public function register(): void
@@ -56,9 +65,10 @@ final class EmployeeServiceProvider extends ServiceProvider
         });
     }
 
-    public function boot(Config $config): void
+    public function boot(Config $config, Dispatcher $events): void
     {
         $this->loadMigrationsFrom(__DIR__.'/Database/Migrations');
+        $events->listen(DepartmentRenamed::class, SyncDepartmentName::class);
 
         if (! $this->app->routesAreCached()) {
             Route::middleware('api')

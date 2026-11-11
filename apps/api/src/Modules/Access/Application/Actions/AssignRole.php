@@ -10,7 +10,7 @@ use Meridian\Modules\Access\Contracts\RoleAssigner;
 use Meridian\Modules\Access\Domain\Repositories\RoleRepository;
 
 /**
- * Grants a role to a user and invalidates their cached permission set.
+ * Grants roles to users and invalidates their cached permission set.
  */
 final readonly class AssignRole implements RoleAssigner
 {
@@ -24,6 +24,15 @@ final readonly class AssignRole implements RoleAssigner
         $role = $this->roles->findByKey($roleKey) ?? throw RoleNotFound::withKey($roleKey);
 
         $this->roles->assign($userId, $role, $grantedBy);
+        $this->authorizer->forget($userId);
+    }
+
+    public function replace(string $userId, string $roleKey, ?string $grantedBy = null): void
+    {
+        $role = $this->roles->findByKey($roleKey) ?? throw RoleNotFound::withKey($roleKey);
+
+        $this->roles->assign($userId, $role, $grantedBy);
+        $this->roles->revokeAllExcept($userId, $role);
         $this->authorizer->forget($userId);
     }
 

@@ -18,6 +18,13 @@ interface RoleAssigner
     public function assign(string $userId, string $roleKey, ?string $grantedBy = null): void;
 
     /**
+     * Makes the role the user's only role.
+     *
+     * @throws RoleNotFound
+     */
+    public function replace(string $userId, string $roleKey, ?string $grantedBy = null): void;
+
+    /**
      * @return list<string> Role keys currently assigned to the user.
      */
     public function rolesOf(string $userId): array;

@@ -9,12 +9,22 @@ use Illuminate\Foundation\Http\FormRequest;
 use Meridian\Modules\Employee\Application\Data\NewEmployeeData;
 use Meridian\Modules\Employee\Domain\ValueObjects\EmployeeStatus;
 use Meridian\Modules\Employee\Domain\ValueObjects\EmploymentType;
+use Meridian\Shared\Http\CurrentActor;
 
+/**
+ * POST /employees. An optional "account": {"role": "…"} also creates a
+ * sign-in account, which requires user.manage and access.manage.
+ */
 final class StoreEmployeeRequest extends FormRequest
 {
+    private const ACCOUNT = 'account';
+
+    private const ACCOUNT_ROLE = 'account.role';
+
     public function authorize(): bool
     {
-        return AuthorizesSensitiveFields::allows($this);
+        return AuthorizesSensitiveFields::allows($this)
+            && (! $this->has(self::ACCOUNT) || AuthorizesAccountManagement::allows($this));
     }
 
     /**
@@ -22,7 +32,11 @@ final class StoreEmployeeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return EmployeeRules::forCreate();
+        return [
+            ...EmployeeRules::forCreate(),
+            self::ACCOUNT => ['sometimes', 'array:role'],
+            self::ACCOUNT_ROLE => ['required_with:'.self::ACCOUNT, 'string', 'max:50'],
+        ];
     }
 
     public function toData(): NewEmployeeData
@@ -42,6 +56,12 @@ final class StoreEmployeeRequest extends FormRequest
             personalEmail: $this->input('personal_email'),
             phone: $this->input('phone'),
             dateOfBirth: $this->input('date_of_birth'),
+            accountRole: $this->input(self::ACCOUNT_ROLE),
         );
+    }
+
+    public function actorId(): ?string
+    {
+        return CurrentActor::id($this);
     }
 }

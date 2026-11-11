@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { Lock } from 'lucide-react';
 import { useMemo } from 'react';
 import { ErrorState } from '@/components/ErrorState';
@@ -7,15 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDocumentTitle } from '@/hooks/use-document-title';
-import { RoleService } from '@/services/role-service';
 import { humanize } from '@/shared/lib/format';
-import { queryKeys } from '@/shared/lib/query-keys';
 import type { PermissionDefinition } from '@/types/api';
+import { usePermissionCatalogue, useRoles } from './role-queries';
 
 export default function RolesPage() {
   useDocumentTitle('Roles');
-  const roles = useQuery({ queryKey: queryKeys.roles.all, queryFn: ({ signal }) => RoleService.roles(signal) });
-  const permissions = useQuery({ queryKey: queryKeys.roles.permissions, queryFn: ({ signal }) => RoleService.permissions(signal) });
+  const roles = useRoles();
+  const permissions = usePermissionCatalogue();
 
   const byModule = useMemo(() => {
     const groups = new Map<string, PermissionDefinition[]>();

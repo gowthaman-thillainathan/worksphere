@@ -18,19 +18,26 @@ use Meridian\Shared\Domain\Services\Hierarchy;
  */
 final readonly class EmployeeInvariants
 {
+    private const NO_DEPARTMENT = '';
+
     public function __construct(
         private EmployeeRepository $employees,
         private DepartmentLookup $departments,
     ) {}
 
     /**
+     * The name to store with the employee for sorting: empty when there is
+     * no department.
+     *
      * @throws InvalidDepartment
      */
-    public function assertValidDepartment(?string $departmentId): void
+    public function departmentNameFor(?string $departmentId): string
     {
-        if ($departmentId !== null && ! $this->departments->exists($departmentId)) {
-            throw new InvalidDepartment;
+        if ($departmentId === null) {
+            return self::NO_DEPARTMENT;
         }
+
+        return $this->departments->nameOf($departmentId) ?? throw new InvalidDepartment;
     }
 
     /**

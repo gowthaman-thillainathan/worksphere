@@ -42,6 +42,11 @@ final class EloquentRoleRepository implements RoleRepository
         );
     }
 
+    public function revokeAllExcept(string $userId, Role $keep): void
+    {
+        RoleAssignment::query()->where('user_id', $userId)->where('role_id', '!=', $keep->id)->delete();
+    }
+
     public function keysAssignedTo(string $userId): array
     {
         /** @var list<string> */

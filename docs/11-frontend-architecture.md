@@ -23,14 +23,14 @@ apps/web/
 │   ├── assets/
 │   ├── components/              design system
 │   │   ├── ui/                  primitives: button, input, select, checkbox, dialog (Modal/Drawer),
-│   │   │                        dropdown-menu, avatar, badge, card, skeleton, sonner (toasts)
+│   │   │                        dropdown-menu, avatar, badge, card, skeleton, tabs, progress, sonner (toasts)
 │   │   ├── data-table/          generic DataTable (server-side sort, skeleton rows, empty state)
 │   │   └── *.tsx                SearchInput, CursorPagination, EmptyState, ErrorState, FormField,
-│   │                            ConfirmDialog, PageHeader, LoadingScreen
+│   │                            ConfirmDialog, PageHeader, LoadingScreen, Stepper, FileDropzone
 │   ├── features/                one folder per business area
 │   │   ├── auth/                login, forgot/reset password, verify e-mail, banner
 │   │   ├── dashboard/           page + widgets
-│   │   ├── employees/           api/ (queries, mutations), components/, lib/ (schemas, URL state, labels), pages/
+│   │   ├── employees/           api/ (queries, mutations), hooks/, components/, lib/, pages/ — see docs/12
 │   │   ├── departments/
 │   │   ├── roles/
 │   │   ├── settings/
@@ -135,6 +135,7 @@ sequenceDiagram
 | Access token | `tokenStore` (module) | Outside React: the HTTP layer needs it synchronously |
 | Theme | `ThemeProvider` + `localStorage` | Light, dark or system; an inline script in `index.html` prevents a flash of the wrong theme |
 | List filters, sort, cursor | URL search params | Bookmarkable and shareable; the back button works (`useEmployeeListQuery`) |
+| Table column choice | `localStorage` via `usePersistentState` | Per browser, validated on read |
 | Form state | React Hook Form + Zod | Client rules mirror the API; server 409/422 errors are mapped back by `useFormServerErrors` |
 
 **Mutations:**
@@ -170,7 +171,9 @@ sequenceDiagram
 |---|---|---|
 | Unit | Vitest | Error mapping, URL state, form rules and payload diffing, theme |
 | Integration | Vitest + Testing Library + MSW | The real app (providers, guards, lazy pages) against a mocked API: login, redirects, permission-hidden navigation, directory search/sort/paging, optimistic delete rollback, server errors on fields; the refresh queue with concurrent 401s |
-| End-to-end | Playwright (desktop + mobile) | Built SPA + Laravel API + PostgreSQL: sign-in errors, session restore after reload, sign-out, employee create → edit → search → delete → restore |
+| End-to-end | Playwright (desktop + mobile) | Built SPA + Laravel API + PostgreSQL: sign-in errors, session restore after reload, sign-out, employee wizard → edit → audit history → search → delete with reason → restore |
+
+The employee module's components, state and API use are described in [12 — Employee Module](12-employee-module.md).
 
 MSW fails any test that makes an unexpected request (`onUnhandledRequest: 'error'`).
 

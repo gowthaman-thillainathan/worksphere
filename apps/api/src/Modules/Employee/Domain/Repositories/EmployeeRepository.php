@@ -27,6 +27,9 @@ interface EmployeeRepository
 
     public function save(Employee $employee): void;
 
+    /**
+     * Persists pending changes (e.g. the deletion reason) and soft-deletes.
+     */
     public function softDelete(Employee $employee): void;
 
     public function restore(Employee $employee): void;
@@ -49,4 +52,13 @@ interface EmployeeRepository
      * Atomically reserves the next employee number sequence value.
      */
     public function nextSequenceValue(): int;
+
+    /**
+     * Refreshes the department name copied onto employees (deleted ones
+     * included). Does not bump versions: the employee record itself did not
+     * change.
+     *
+     * @return int Number of employees updated.
+     */
+    public function renameDepartment(string $departmentId, string $name): int;
 }

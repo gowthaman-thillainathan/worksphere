@@ -21,8 +21,11 @@ Every error is an RFC 9457 `application/problem+json` document with a stable
  * OpenAPI spec version: 1.0.0
  */
 import type {
+  EmployeeAccountEnvelope,
   EmployeeCreate,
+  EmployeeDeletion,
   EmployeeEnvelope,
+  EmployeeRole,
   EmployeeUpdate,
   GetEmployeeHeadcount200,
   ListEmployees200,
@@ -57,6 +60,11 @@ export const listEmployees = (
  * Requires `employee.create`; personal fields (`personal_email`, `phone`,
 `date_of_birth`) also require `employee.update.sensitive`. The employee number is
 generated. Audited as `employee.created`.
+
+With `account`, a sign-in account with that role is created in the same transaction
+(requires `user.manage` and `access.manage`) and the employee is e-mailed an invitation
+to set a password. An unknown role is a 422 (`invalid_role`); an address that already
+has an account is a 409 (`email_already_taken`).
 
  * @summary Create an employee
  */
@@ -114,20 +122,26 @@ export const updateEmployee = (
     }
   /**
  * Requires `employee.delete` and `If-Match`. The record is hidden from the directory but
-kept (restorable, history preserved). Employees with direct reports cannot be deleted.
+kept (restorable, history preserved). The reason is stored with the record and in the
+audit trail (`employee.deleted`). Employees with direct reports cannot be deleted.
 
  * @summary Soft-delete an employee
  */
 export const deleteEmployee = (
     employee: string,
+    employeeDeletion: BodyType<EmployeeDeletion>,
  options?: SecondParameter<typeof apiRequest<void>>,) => {
       return apiRequest<void>(
-      {url: `/employees/${employee}`, method: 'DELETE'
+      {url: `/employees/${employee}`, method: 'DELETE',
+      headers: {'Content-Type': 'application/json', },
+      data: employeeDeletion
     },
       options);
     }
   /**
- * Requires `employee.delete`. Idempotent. Fails with 409 if the work e-mail was reused meanwhile.
+ * Requires `employee.delete`. Idempotent. Clears the deletion reason; audited as
+`employee.restored`. Fails with 409 if the work e-mail was reused meanwhile.
+
  * @summary Restore a soft-deleted employee
  */
 export const restoreEmployee = (
@@ -182,6 +196,53 @@ export const deleteEmployeePhoto = (
     },
       options);
     }
+  /**
+ * Requires `employee.view` and `user.manage`. 404 (`employee_account_not_found`) when the employee has none.
+ * @summary The employee's sign-in account
+ */
+export const getEmployeeAccount = (
+    employee: string,
+ options?: SecondParameter<typeof apiRequest<EmployeeAccountEnvelope>>,) => {
+      return apiRequest<EmployeeAccountEnvelope>(
+      {url: `/employees/${employee}/account`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * Requires `employee.view`, `user.manage` and `access.manage`. The account uses the
+employee's work e-mail address and the given role; the employee is e-mailed an
+invitation to set a password. Audited on the employee as `employee.account_created`.
+
+ * @summary Give the employee a sign-in account
+ */
+export const createEmployeeAccount = (
+    employee: string,
+    employeeRole: BodyType<EmployeeRole>,
+ options?: SecondParameter<typeof apiRequest<EmployeeAccountEnvelope>>,) => {
+      return apiRequest<EmployeeAccountEnvelope>(
+      {url: `/employees/${employee}/account`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: employeeRole
+    },
+      options);
+    }
+  /**
+ * Requires `employee.view`, `user.manage` and `access.manage`. Replaces the account's role.
+Audited on the employee as `employee.role_changed`; unchanged roles are a no-op.
+
+ * @summary Change the role of the employee's account
+ */
+export const changeEmployeeRole = (
+    employee: string,
+    employeeRole: BodyType<EmployeeRole>,
+ options?: SecondParameter<typeof apiRequest<EmployeeAccountEnvelope>>,) => {
+      return apiRequest<EmployeeAccountEnvelope>(
+      {url: `/employees/${employee}/account/role`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: employeeRole
+    },
+      options);
+    }
   export type ListEmployeesResult = NonNullable<Awaited<ReturnType<typeof listEmployees>>>
 export type CreateEmployeeResult = NonNullable<Awaited<ReturnType<typeof createEmployee>>>
 export type GetEmployeeHeadcountResult = NonNullable<Awaited<ReturnType<typeof getEmployeeHeadcount>>>
@@ -192,3 +253,6 @@ export type RestoreEmployeeResult = NonNullable<Awaited<ReturnType<typeof restor
 export type GetEmployeePhotoResult = NonNullable<Awaited<ReturnType<typeof getEmployeePhoto>>>
 export type UploadEmployeePhotoResult = NonNullable<Awaited<ReturnType<typeof uploadEmployeePhoto>>>
 export type DeleteEmployeePhotoResult = NonNullable<Awaited<ReturnType<typeof deleteEmployeePhoto>>>
+export type GetEmployeeAccountResult = NonNullable<Awaited<ReturnType<typeof getEmployeeAccount>>>
+export type CreateEmployeeAccountResult = NonNullable<Awaited<ReturnType<typeof createEmployeeAccount>>>
+export type ChangeEmployeeRoleResult = NonNullable<Awaited<ReturnType<typeof changeEmployeeRole>>>

@@ -15,7 +15,8 @@ use Meridian\Shared\Domain\Exceptions\StaleVersion;
 
 /**
  * Soft delete: the record leaves the directory but stays restorable and
- * keeps its audit history. Employees who still manage others cannot be
+ * keeps its audit history. A reason is required and stored with the record
+ * and in the audit trail. Employees who still manage others cannot be
  * deleted, so no one is left reporting to a removed manager.
  */
 final readonly class DeleteEmployee
@@ -26,9 +27,9 @@ final readonly class DeleteEmployee
         private ConnectionInterface $database,
     ) {}
 
-    public function handle(string $employeeId, int $expectedVersion): void
+    public function handle(string $employeeId, int $expectedVersion, string $reason): void
     {
-        $this->database->transaction(function () use ($employeeId, $expectedVersion): void {
+        $this->database->transaction(function () use ($employeeId, $expectedVersion, $reason): void {
             $employee = $this->employees->findForUpdate($employeeId) ?? throw EmployeeNotFound::withId($employeeId);
 
             if ($employee->version !== $expectedVersion) {
@@ -39,12 +40,15 @@ final readonly class DeleteEmployee
                 throw new HasDirectReports;
             }
 
+            $employee->deletion_reason = $reason;
+            $employee->version++;
             $this->employees->softDelete($employee);
 
             $this->audit->record(new AuditRecord(
                 action: EmployeeAuditAction::Deleted->value,
                 subjectType: EmployeeAuditAction::SUBJECT_TYPE,
                 subjectId: $employee->id,
+                changes: [EmployeeAuditAction::DELETION_REASON_FIELD => [null, $reason]],
             ));
         });
     }
