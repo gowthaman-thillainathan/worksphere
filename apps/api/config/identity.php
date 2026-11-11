@@ -60,12 +60,13 @@ return [
         'duration_seconds' => (int) env('AUTH_LOCKOUT_DURATION', 900),
     ],
 
+    // Per minute. Raise only for automated test environments (E2E suites sign in many times).
     'rate_limits' => [
-        'login_per_account' => 5,
-        'login_per_ip' => 20,
-        'password_reset_per_ip' => 5,
-        'refresh_per_ip' => 30,
-        'verification_per_user' => 6,
+        'login_per_account' => (int) env('AUTH_RATE_LIMIT_LOGIN_PER_ACCOUNT', 5),
+        'login_per_ip' => (int) env('AUTH_RATE_LIMIT_LOGIN_PER_IP', 20),
+        'password_reset_per_ip' => (int) env('AUTH_RATE_LIMIT_PASSWORD_RESET_PER_IP', 5),
+        'refresh_per_ip' => (int) env('AUTH_RATE_LIMIT_REFRESH_PER_IP', 30),
+        'verification_per_user' => (int) env('AUTH_RATE_LIMIT_VERIFICATION_PER_USER', 6),
     ],
 
     /*
@@ -99,8 +100,8 @@ return [
     'frontend_paths' => [
         'forgot_password' => '/forgot-password',
         'reset_password' => '/reset-password',
-        'email_verified' => '/email-verified',
-        'email_verification_failed' => '/email-verification-failed',
+        'email_verified' => '/verify-email?status=verified',
+        'email_verification_failed' => '/verify-email?status=failed',
     ],
 
 ];

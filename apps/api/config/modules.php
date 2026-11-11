@@ -6,6 +6,7 @@ use Meridian\Modules\Access\AccessServiceProvider;
 use Meridian\Modules\Audit\AuditServiceProvider;
 use Meridian\Modules\Employee\EmployeeServiceProvider;
 use Meridian\Modules\Identity\IdentityServiceProvider;
+use Meridian\Modules\Organisation\OrganisationServiceProvider;
 
 return [
 
@@ -23,6 +24,7 @@ return [
         IdentityServiceProvider::class,
         AccessServiceProvider::class,
         AuditServiceProvider::class,
+        OrganisationServiceProvider::class,
         EmployeeServiceProvider::class,
     ],
 

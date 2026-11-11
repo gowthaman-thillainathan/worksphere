@@ -86,6 +86,8 @@ PostgreSQL 16 on Amazon RDS. One database, one schema (`public`), shared by all 
 
 ### 2.4 Organisation
 
+> **Implemented (Phase 5):** `departments` (`code` unique and stored upper-case, `name`, `description`, `parent_id` self-reference, `version`) and `employees.department_id`. Hierarchy cycles are prevented in the application. The `ltree` path, `head_employee_id`, cost centres, locations, positions and job grades are still to come.
+
 **departments**
 
 | Column | Type | Notes |

@@ -5,23 +5,33 @@ declare(strict_types=1);
 namespace Meridian\Modules\Employee\Domain\Services;
 
 use DateTimeInterface;
+use Meridian\Modules\Employee\Domain\Exceptions\InvalidDepartment;
 use Meridian\Modules\Employee\Domain\Exceptions\InvalidEmploymentDates;
 use Meridian\Modules\Employee\Domain\Exceptions\InvalidManager;
 use Meridian\Modules\Employee\Domain\Exceptions\WorkEmailInUse;
 use Meridian\Modules\Employee\Domain\Repositories\EmployeeRepository;
 use Meridian\Modules\Employee\Domain\ValueObjects\EmployeeStatus;
+use Meridian\Shared\Domain\Services\Hierarchy;
 
 /**
  * Rules that span more than one employee and must hold for every write path.
  */
 final readonly class EmployeeInvariants
 {
-    /**
-     * Guards against corrupted data turning the walk into an endless loop.
-     */
-    private const MAX_REPORTING_DEPTH = 100;
+    public function __construct(
+        private EmployeeRepository $employees,
+        private DepartmentLookup $departments,
+    ) {}
 
-    public function __construct(private EmployeeRepository $employees) {}
+    /**
+     * @throws InvalidDepartment
+     */
+    public function assertValidDepartment(?string $departmentId): void
+    {
+        if ($departmentId !== null && ! $this->departments->exists($departmentId)) {
+            throw new InvalidDepartment;
+        }
+    }
 
     /**
      * @throws WorkEmailInUse
@@ -53,7 +63,7 @@ final readonly class EmployeeInvariants
             throw InvalidManager::notFound();
         }
 
-        if ($employeeId !== null && $this->reportsTo($managerId, $employeeId)) {
+        if ($employeeId !== null && Hierarchy::wouldCreateCycle($employeeId, $managerId, $this->employees->managerIdOf(...))) {
             throw InvalidManager::cycle();
         }
     }
@@ -70,20 +80,5 @@ final readonly class EmployeeInvariants
         if ($terminationDate !== null && $terminationDate < $hireDate) {
             throw InvalidEmploymentDates::terminationBeforeHire();
         }
-    }
-
-    private function reportsTo(string $employeeId, string $possibleManagerId): bool
-    {
-        $current = $this->employees->managerIdOf($employeeId);
-
-        for ($depth = 0; $current !== null && $depth < self::MAX_REPORTING_DEPTH; $depth++) {
-            if ($current === $possibleManagerId) {
-                return true;
-            }
-
-            $current = $this->employees->managerIdOf($current);
-        }
-
-        return $current !== null;
     }
 }

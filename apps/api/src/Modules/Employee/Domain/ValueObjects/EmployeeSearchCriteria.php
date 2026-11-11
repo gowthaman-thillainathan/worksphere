@@ -29,6 +29,7 @@ final readonly class EmployeeSearchCriteria
         public array $statuses = [],
         public array $employmentTypes = [],
         public ?string $managerId = null,
+        public ?string $departmentId = null,
         public ?DateTimeImmutable $hiredFrom = null,
         public ?DateTimeImmutable $hiredTo = null,
         public TrashedFilter $trashed = TrashedFilter::Without,

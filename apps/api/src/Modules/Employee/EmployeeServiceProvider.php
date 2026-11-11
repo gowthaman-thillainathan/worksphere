@@ -11,12 +11,16 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Meridian\Modules\Employee\Application\Data\EmployeeNumberPolicy;
 use Meridian\Modules\Employee\Domain\Repositories\EmployeeRepository;
+use Meridian\Modules\Employee\Domain\Services\DepartmentLookup;
 use Meridian\Modules\Employee\Domain\Services\EmployeePhotoStorage;
+use Meridian\Modules\Employee\Infrastructure\Organisation\EmployeeDepartmentReferenceChecker;
+use Meridian\Modules\Employee\Infrastructure\Organisation\OrganisationDepartmentLookup;
 use Meridian\Modules\Employee\Infrastructure\Persistence\Repositories\EloquentEmployeeRepository;
 use Meridian\Modules\Employee\Infrastructure\Storage\FilesystemEmployeePhotoStorage;
+use Meridian\Modules\Organisation\Contracts\DepartmentReferenceChecker;
 
 /**
- * Employee module: profiles, directory search and profile photos.
+ * Employee module: profiles, directory search, headcount and profile photos.
  */
 final class EmployeeServiceProvider extends ServiceProvider
 {
@@ -25,10 +29,14 @@ final class EmployeeServiceProvider extends ServiceProvider
      */
     public array $bindings = [
         EmployeeRepository::class => EloquentEmployeeRepository::class,
+        DepartmentLookup::class => OrganisationDepartmentLookup::class,
     ];
 
     public function register(): void
     {
+        // Lets the Organisation module refuse to delete departments that still have employees.
+        $this->app->tag([EmployeeDepartmentReferenceChecker::class], DepartmentReferenceChecker::TAG);
+
         $this->app->singleton(EmployeePhotoStorage::class, static function (Application $app): EmployeePhotoStorage {
             $config = $app->make(Config::class);
 

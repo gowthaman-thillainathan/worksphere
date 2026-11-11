@@ -203,6 +203,8 @@ sequenceDiagram
 
 ## 8. Frontend Architecture
 
+> Implemented in `apps/web`; details in [11 — Frontend Architecture](11-frontend-architecture.md). As built, the SPA uses an Orval-generated Axios client and keeps the access token in memory only (ADR-0006), instead of the cookie session described below for ADR-0003.
+
 - **SPA** built with Vite, deployed as static assets to S3 + CloudFront.
 - **Feature-sliced** structure: each feature (employees, leave, …) owns its routes, API hooks, components and types.
 - **Server state** in TanStack Query (cache, retries, optimistic updates). **Client state** kept minimal (Zustand for UI-only state such as sidebar, theme).

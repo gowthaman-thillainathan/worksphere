@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Meridian\Modules\Access\Contracts\Permission;
 use Meridian\Modules\Employee\Http\Controllers\EmployeeController;
 use Meridian\Modules\Employee\Http\Controllers\EmployeePhotoController;
+use Meridian\Modules\Employee\Http\Controllers\HeadcountController;
 use Meridian\Shared\Http\MiddlewareGroup;
 
 /*
@@ -23,6 +24,7 @@ Route::middleware(MiddlewareGroup::Authenticated->value)
     ->whereUuid('employee')
     ->group(static function () use ($can): void {
         Route::get('/', [EmployeeController::class, 'index'])->middleware($can(Permission::EmployeeView))->name('index');
+        Route::get('headcount', HeadcountController::class)->middleware($can(Permission::EmployeeView))->name('headcount');
         Route::post('/', [EmployeeController::class, 'store'])->middleware($can(Permission::EmployeeCreate))->name('store');
         Route::get('{employee}', [EmployeeController::class, 'show'])->middleware($can(Permission::EmployeeView))->name('show');
         Route::patch('{employee}', [EmployeeController::class, 'update'])->middleware($can(Permission::EmployeeUpdate))->name('update');

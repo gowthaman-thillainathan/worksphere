@@ -14,6 +14,9 @@ use Meridian\Shared\Domain\Exceptions\DomainException;
 /**
  * Provisions an account from the command line, e.g. the first tenant admin:
  *   php artisan identity:create-user admin@example.com --name="Ada Admin" --role=tenant_admin
+ *
+ * Unattended (CI, provisioning scripts) — the password never appears in argv:
+ *   printf '%s' "$PASSWORD" | php artisan identity:create-user e2e@example.com --name=E2E --password-stdin --verified
  */
 final class CreateUserCommand extends Command
 {
@@ -23,7 +26,9 @@ final class CreateUserCommand extends Command
     protected $signature = 'identity:create-user
         {email : E-mail address (used to sign in)}
         {--name= : Display name}
-        {--role=* : Role key(s) to grant, e.g. tenant_admin}';
+        {--role=* : Role key(s) to grant, e.g. tenant_admin}
+        {--password-stdin : Read the password from standard input instead of prompting}
+        {--verified : Mark the e-mail address as verified (trusted provisioning only)}';
 
     /**
      * @var string
@@ -35,7 +40,7 @@ final class CreateUserCommand extends Command
         $input = [
             'email' => (string) $this->argument('email'),
             'name' => (string) ($this->option('name') ?: $this->ask('Name')),
-            'password' => (string) $this->secret('Password'),
+            'password' => $this->option('password-stdin') ? $this->passwordFromStdin() : (string) $this->secret('Password'),
         ];
 
         $validator = $validators->make($input, [
@@ -55,15 +60,32 @@ final class CreateUserCommand extends Command
         try {
             /** @var list<string> $roles */
             $roles = $this->option('role');
-            $user = $createUser->handle(new CreateUserData($input['name'], $input['email'], $input['password'], $roles));
+            $user = $createUser->handle(new CreateUserData(
+                name: $input['name'],
+                email: $input['email'],
+                password: $input['password'],
+                roleKeys: $roles,
+                emailVerified: (bool) $this->option('verified'),
+            ));
         } catch (DomainException $exception) {
             $this->components->error($exception->getMessage());
 
             return self::FAILURE;
         }
 
+        if ($user->hasVerifiedEmail()) {
+            $this->components->info(sprintf('Created verified user %s (%s).', $user->email, $user->id));
+
+            return self::SUCCESS;
+        }
+
         $this->components->info(sprintf('Created user %s (%s). A verification e-mail has been sent.', $user->email, $user->id));
 
         return self::SUCCESS;
+    }
+
+    private function passwordFromStdin(): string
+    {
+        return rtrim((string) stream_get_contents(STDIN), "\r\n");
     }
 }

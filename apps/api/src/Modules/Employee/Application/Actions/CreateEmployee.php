@@ -46,6 +46,7 @@ final readonly class CreateEmployee
         $employeeId = $this->database->transaction(function () use ($data): string {
             $this->invariants->assertWorkEmailAvailable($data->workEmail);
             $this->invariants->assertValidManager(null, $data->managerId);
+            $this->invariants->assertValidDepartment($data->departmentId);
 
             $employee = new Employee($data->toAttributes());
             $employee->employee_number = EmployeeNumber::fromSequence(

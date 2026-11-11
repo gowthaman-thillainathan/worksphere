@@ -38,6 +38,7 @@ final class StoreEmployeeRequest extends FormRequest
             preferredName: $this->input('preferred_name'),
             terminationDate: $this->filled('termination_date') ? CarbonImmutable::parse($this->string('termination_date')->toString()) : null,
             managerId: $this->input('manager_id'),
+            departmentId: $this->input('department_id'),
             personalEmail: $this->input('personal_email'),
             phone: $this->input('phone'),
             dateOfBirth: $this->input('date_of_birth'),

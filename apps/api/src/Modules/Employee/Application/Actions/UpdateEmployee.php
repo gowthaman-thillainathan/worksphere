@@ -47,6 +47,10 @@ final readonly class UpdateEmployee
                 $this->invariants->assertValidManager($employee->id, $changes->get('manager_id'));
             }
 
+            if ($changes->has('department_id')) {
+                $this->invariants->assertValidDepartment($changes->get('department_id'));
+            }
+
             $before = $employee->auditSnapshot();
             $employee->fill($changes->attributes);
             EmployeeInvariants::assertValidDates($employee->status, $employee->hire_date, $employee->termination_date);

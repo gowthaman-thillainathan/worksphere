@@ -10,6 +10,7 @@ final readonly class CreateUserData
 {
     /**
      * @param  list<string>  $roleKeys
+     * @param  bool  $emailVerified  Trusted provisioning only: skips the verification e-mail.
      */
     public function __construct(
         public string $name,
@@ -17,5 +18,6 @@ final readonly class CreateUserData
         #[SensitiveParameter]
         public string $password,
         public array $roleKeys = [],
+        public bool $emailVerified = false,
     ) {}
 }
